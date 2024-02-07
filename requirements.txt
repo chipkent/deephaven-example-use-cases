@@ -1,0 +1,4 @@
+deephaven-server
+scipy
+numba
+numpy
