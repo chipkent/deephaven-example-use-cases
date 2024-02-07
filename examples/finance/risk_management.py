@@ -312,19 +312,28 @@ portfolio_current = portfolio_history \
 # Risk
 ############################################################################################################
 
+betas = empty_table(1) \
+    .update(["USym = usyms_array"]) \
+    .ungroup() \
+    .update(["Beta = random() * 2 - 0.5"])
+
 risk_all = greek_current \
     .natural_join(portfolio_current, ["USym", "Strike", "Expiry", "Parity"]) \
+    .natural_join(betas, "USym") \
     .update([
         "Theo = Theo * Position",
         "DollarDelta = UMid * Delta * Position",
-        "Gamma = UMid * Gamma * Position",
+        "BetaDollarDelta = Beta * DollarDelta",
+        "GammaPercent = UMid * Gamma * Position",
         "Theta = Theta * Position",
         "VegaPercent = VolMid * Vega * Position",
         "Rho = Rho * Position",
         "JumpUp10 = JumpUp10 * Position",
         "JumpDown10 = JumpDown10 * Position",
     ]) \
-    .view(["USym", "Strike", "Expiry", "Parity", "Delta", "Gamma", "Theta", "Vega", "Rho", "JumpUp10", "JumpDown10"])
+    .view([
+        "USym", "Strike", "Expiry", "Parity",
+        "Theo", "DollarDelta", "BetaDollarDelta", "GammaPercent", "VegaPercent", "Theta", "Rho", "JumpUp10", "JumpDown10"])
 
 risk_ue = risk_all \
     .drop_columns(["Strike", "Parity"]) \
@@ -337,6 +346,10 @@ risk_u = risk_ue \
 risk_e = risk_ue \
     .drop_columns("USym") \
     .sum_by("Expiry")
+
+risk_net = risk_ue \
+    .drop_columns(["USym", "Expiry"]) \
+    .sum_by()
 
 ############################################################################################################
 # Trade analysis
