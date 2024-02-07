@@ -3,26 +3,25 @@
 # _s = Server(port=10000, jvm_args=["-Xmx16g"])
 # _s.start()
 
+import math
+import numpy as np
+import numpy.typing as npt
+import numba
+from datetime import date, datetime, timedelta
+from deephaven import time_table, empty_table, merge, updateby as uby, dtypes as dht
+
+
+
 #TODO: document
 
 
 #TODO: TARGET
-# If you can get me the fake-data.... and ideally orders, trades, positions, pnl (essentially how each turns into the other).....
-# Either with fake stock price data or real FeedOS market stock data....
-# Then I can do the rest (aggregations, dashboards, plaots, deephaven.ui -- maybe even  pivots [dunno, we'll see if charles' toy is up to a demo task]).
-# Extra credit:
 # Something for PNL attribution -- some sort of factor thing.
 # VAR or some other slide-run risk -- maybe correlation infrastructure -- again can all be fake or statically canned from wherever.
-# Really stretch -- though totally unnecessary -- something for a basic options use case.
 
 ############################################################################################################
 # Black-Scholes
 ############################################################################################################
-
-import math
-import numpy as np
-import numba
-
 
 @numba.vectorize(['float64(float64)'])
 def norm_cdf(x):
@@ -128,15 +127,14 @@ def black_scholes_rho(s, k, r, t, vol, is_call, is_stock):
 # Underlying price simulation
 ############################################################################################################
 
-from deephaven import time_table, empty_table
-
-syms = ["AAPL", "GOOG", "MSFT", "AMZN", "FB", "TSLA", "NVDA", "INTC", "CSCO", "ADBE", "SPY", "QQQ", "DIA", "IWM", "GLD", "SLV", "USO", "UNG", "TLT", "IEF", "LQD", "HYG", "JNK"]
-last_price = {s: round(np.abs(np.random.normal(100, 30.0)), 2) for s in syms}
-last_vol = {s: np.abs(np.random.normal(0.4, 0.2))+0.03 for s in syms}
+usyms = ["AAPL", "GOOG", "MSFT", "AMZN", "FB", "TSLA", "NVDA", "INTC", "CSCO", "ADBE", "SPY", "QQQ", "DIA", "IWM", "GLD", "SLV", "USO", "UNG", "TLT", "IEF", "LQD", "HYG", "JNK"]
+usyms_array = dht.array(dht.string, usyms)
+last_price = {s: round(np.abs(np.random.normal(100, 30.0)), 2) for s in usyms}
+last_vol = {s: np.abs(np.random.normal(0.4, 0.2))+0.03 for s in usyms}
 
 def gen_sym() -> str:
     """ Generate a random symbol """
-    return syms[np.random.randint(0, len(syms))]
+    return usyms[np.random.randint(0, len(usyms))]
 
 def gen_price(sym: str) -> float:
     """ Generate a random price for a given symbol """
@@ -154,17 +152,25 @@ def gen_vol(sym: str) -> float:
     last_vol[sym] = v
     return v
 
-underlying_prices = time_table("PT00:00:00.1") \
+_underlying_securities = empty_table(1) \
+    .update(["Type=`STOCK`", "USym = usyms_array"]) \
+    .ungroup() \
     .update([
-        "Type = `STOCK`",
-        "USym = gen_sym()",
-        "Sym = USym",
         "Strike = NULL_DOUBLE",
         "Expiry = (Instant) null",
         "Parity = (String) null",
-        "UBid = gen_price(Sym)",
+    ])
+
+_underlying_prices = time_table("PT00:00:00.1") \
+    .update([
+        "Type = `STOCK`",
+        "USym = gen_sym()",
+        "Strike = NULL_DOUBLE",
+        "Expiry = (Instant) null",
+        "Parity = (String) null",
+        "UBid = gen_price(USym)",
         "UAsk = UBid + randomInt(1, 10)*0.01",
-        "VolBid = gen_vol(Sym)",
+        "VolBid = gen_vol(USym)",
         "VolAsk = VolBid + randomInt(1, 10)*0.01",
         "Bid = UBid",
         "Ask = UAsk",
@@ -172,13 +178,8 @@ underlying_prices = time_table("PT00:00:00.1") \
 
 
 ############################################################################################################
-# Underlying price simulation
+# Option price simulation
 ############################################################################################################
-
-import numpy.typing as npt
-from deephaven import dtypes as dht
-from datetime import date
-from datetime import datetime, timedelta
 
 def compute_strikes(open: float) -> npt.NDArray[np.float64]:
     """ Compute the option strikes from a given underlying opening price """
@@ -193,14 +194,12 @@ def get_strikes(sym: str) -> npt.NDArray[np.float64]:
     """ Get the strikes for a given symbol """
     return strikes[sym]
 
-usyms_array = dht.array(dht.string, syms)
-
 expiry_array = dht.array(dht.Instant, [
     datetime.combine(date.today() + timedelta(days=30), datetime.min.time()),
     datetime.combine(date.today() + timedelta(days=60), datetime.min.time()),
 ])
 
-option_securities = empty_table(1) \
+_option_securities = empty_table(1) \
     .update(["Type=`OPTION`", "USym = usyms_array"]) \
     .ungroup() \
     .update(["Strike = get_strikes(USym)"]) \
@@ -209,15 +208,14 @@ option_securities = empty_table(1) \
     .ungroup() \
     .update(["Parity = new String[] {`CALL`, `PUT`}"]) \
     .ungroup() \
-    .update("Sym = USym + `/` + toLocalDate(Expiry, 'ET') + `/` + Strike + `/` + Parity") \
-    .view(["Type", "USym", "Sym", "Strike", "Expiry", "Parity"])
+    .view(["Type", "USym", "Strike", "Expiry", "Parity"])
 
 rate_risk_free = 0.05
 
-option_prices = underlying_prices \
+_option_prices = _underlying_prices \
     .view(["Timestamp", "USym", "UBid", "UAsk", "VolBid", "VolAsk"]) \
-    .join(option_securities, "USym") \
-    .view(["Timestamp", "Type", "USym", "Sym", "Strike", "Expiry", "Parity", "UBid", "UAsk", "VolBid", "VolAsk"]) \
+    .join(_option_securities, "USym") \
+    .view(["Timestamp", "Type", "USym", "Strike", "Expiry", "Parity", "UBid", "UAsk", "VolBid", "VolAsk"]) \
     .update([
         "DT = diffYearsAvg(Timestamp, Expiry)",
         "IsStock = Type == `STOCK`",
@@ -229,19 +227,30 @@ option_prices = underlying_prices \
 
 
 ############################################################################################################
+# Securities
+############################################################################################################
+
+securities = merge([_underlying_securities, _option_securities])
+
+_underlying_securities = None
+_option_securities = None
+
+############################################################################################################
 # Prices
 ############################################################################################################
 
-from deephaven import merge
 
-prices = merge([underlying_prices, option_prices])
-current_prices = prices.last_by("Sym")
+price_history = merge([_underlying_prices, _option_prices])
+price_current = price_history.last_by(["USym", "Strike", "Expiry", "Parity"])
+
+_underlying_prices = None
+_option_prices = None
 
 ############################################################################################################
 # Greeks
 ############################################################################################################
 
-greeks = prices \
+greek_history = price_history \
     .snapshot_when(time_table("PT00:00:05").drop_columns("Timestamp")) \
     .update([
         "UMid = (UBid + UAsk) / 2",
@@ -255,52 +264,94 @@ greeks = prices \
         "Theta = black_scholes_theta(UBid, Strike, rate_risk_free, DT, VolBid, IsCall, IsStock)",
         "Vega = black_scholes_vega(UBid, Strike, rate_risk_free, DT, VolBid, IsStock)",
         "Rho = black_scholes_rho(UBid, Strike, rate_risk_free, DT, VolBid, IsCall, IsStock)",
+        "UMidUp10 = UMid * 1.1",
+        "UMidDown10 = UMid * 0.9",
+        "Up10 = black_scholes_price(UMidUp10, Strike, rate_risk_free, DT, VolMid, IsCall, IsStock)",
+        "Down10 = black_scholes_price(UMidDown10, Strike, rate_risk_free, DT, VolMid, IsCall, IsStock)",
+        "JumpUp10 = Up10 - Theo",
+        "JumpDown10 = Down10 - Theo",
+    ]) \
+    .drop_columns(["UMidUp10", "UMidDown10", "Up10", "Down10"])
+
+greek_current = greek_history.last_by(["USym", "Strike", "Expiry", "Parity"])
+
+
+############################################################################################################
+# Trade simulation
+############################################################################################################
+
+def get_random_strike(sym: str) -> float:
+    """ Get a random strike for a given underlying symbol """
+    return np.random.choice(strikes[sym])
+
+trade_history = time_table("PT00:00:01") \
+    .update([
+        "Type = random() < 0.3 ? `STOCK` : `OPTION`",
+        "USym = usyms_array[randomInt(0, usyms_array.length)]",
+        "Strike = Type == `STOCK` ? NULL_DOUBLE : get_random_strike(USym)",
+        "Expiry = Type == `STOCK` ? null : expiry_array[randomInt(0, expiry_array.length)]",
+        "Parity = Type == `STOCK` ? null : random() < 0.5 ? `CALL` : `PUT`",
+        "TradeSize = randomInt(-1000, 1000)",
+    ]) \
+    .aj(price_history, ["USym", "Strike", "Expiry", "Parity", "Timestamp"], ["Bid", "Ask"]) \
+    .update(["TradePrice = random() < 0.5 ? Bid : Ask"])
+
+############################################################################################################
+# Portfolio
+############################################################################################################
+
+portfolio_history = trade_history \
+    .update_by([uby.cum_sum("Position=TradeSize")], ["USym", "Strike", "Expiry", "Parity"])
+
+portfolio_current = portfolio_history \
+    .last_by(["USym", "Strike", "Expiry", "Parity"]) \
+    .view(["USym", "Strike", "Expiry", "Parity", "Position"])
+
+
+############################################################################################################
+# Risk
+############################################################################################################
+
+risk_all = greek_current \
+    .natural_join(portfolio_current, ["USym", "Strike", "Expiry", "Parity"]) \
+    .update([
+        "Theo = Theo * Position",
+        "DollarDelta = UMid * Delta * Position",
+        "Gamma = UMid * Gamma * Position",
+        "Theta = Theta * Position",
+        "VegaPercent = VolMid * Vega * Position",
+        "Rho = Rho * Position",
+        "JumpUp10 = JumpUp10 * Position",
+        "JumpDown10 = JumpDown10 * Position",
+    ]) \
+    .view(["USym", "Strike", "Expiry", "Parity", "Delta", "Gamma", "Theta", "Vega", "Rho", "JumpUp10", "JumpDown10"])
+
+risk_ue = risk_all \
+    .drop_columns(["Strike", "Parity"]) \
+    .sum_by(["USym", "Expiry"])
+
+risk_u = risk_ue \
+    .drop_columns("Expiry") \
+    .sum_by("USym")
+
+risk_e = risk_ue \
+    .drop_columns("USym") \
+    .sum_by("Expiry")
+
+############################################################################################################
+# Trade analysis
+############################################################################################################
+
+trade_pnl = trade_history \
+    .view(["Timestamp", "USym", "Strike", "Expiry", "Parity", "TradeSize", "TradePrice"]) \
+    .aj(price_history.update("Timestamp=Timestamp-'PT10m'"), ["USym", "Strike", "Expiry", "Parity", "Timestamp"], ["FutureBid=Bid", "FutureAsk=Ask"]) \
+    .update([
+        "FutureMid = (FutureBid + FutureAsk) / 2",
+        "PriceChange = FutureMid - TradePrice",
+        "PnL = TradeSize * PriceChange",
     ])
 
-current_greeks = greeks.last_by("Sym")
+trade_pnl_by_sym = trade_pnl \
+    .view(["USym", "PnL"]) \
+    .sum_by("USym")
 
-
-
-# from deephaven import time_table, updateby as uby
-#
-# # Set up a price feed
-#
-# last_price = {"A" : 100.0, "B": 200.0}
-#
-# def price_generator(sym: str) -> float:
-#     p = last_price[sym]
-#     p += (random.random()-0.5)
-#     # p = lognormvariate(p, 0.0)
-#     last_price["sym"] = p
-#     return p
-#
-# prices = time_table("PT00:00:00.1") \
-#     .update([
-#         "Sym = ii%2==0 ? `A` : `B`",
-#         "Price = price_generator(Sym)",
-#     ])
-#
-# # Set up a trade feed
-#
-# trades = time_table("PT00:00:01") \
-#     .update([
-#         "Sym = ii%2==0 ? `A` : `B`",
-#         "Size = randomInt(-1000, 1000)",
-#         "Direction = Size > 0 ? `LONG` : `SHORT`",
-#         ]) \
-#     .aj(prices, ["Sym", "Timestamp"], ["Price"])
-#
-# # Compute portfolio views -- these could also be feeds
-#
-# portfolio_hist = trades.update_by([uby.cum_sum("Size")], "Sym")
-#
-# portfolio = portfolio_hist.drop_columns("Direction").last_by("Sym")
-#
-# # Do some trade analysis
-#
-# analysis = trades \
-#     .aj(
-#         prices.update_view(["FutureTimestamp=Timestamp", "Timestamp=Timestamp-'PT00:01:00'"]),
-#         ["Sym", "Timestamp"], ["FuturePrice=Price"] \
-#         ) \
-#     .update_view("PriceChange = FuturePrice-Price")
