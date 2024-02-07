@@ -10,17 +10,10 @@ import numba
 from datetime import date, datetime, timedelta
 from deephaven import time_table, empty_table, merge, updateby as uby, dtypes as dht
 
-
-
-#TODO: document
-
-
-#TODO: TARGET
-# Something for PNL attribution -- some sort of factor thing.
-# VAR or some other slide-run risk -- maybe correlation infrastructure -- again can all be fake or statically canned from wherever.
-
 ############################################################################################################
 # Black-Scholes
+#
+# Write a Black-Scholes option pricing model in Python using Numba for vectorization.
 ############################################################################################################
 
 @numba.vectorize(['float64(float64)'])
@@ -125,6 +118,8 @@ def black_scholes_rho(s, k, r, t, vol, is_call, is_stock):
 
 ############################################################################################################
 # Underlying price simulation
+#
+# Simulate the price and volatility of a set of underlying securities
 ############################################################################################################
 
 usyms = ["AAPL", "GOOG", "MSFT", "AMZN", "FB", "TSLA", "NVDA", "INTC", "CSCO", "ADBE", "SPY", "QQQ", "DIA", "IWM", "GLD", "SLV", "USO", "UNG", "TLT", "IEF", "LQD", "HYG", "JNK"]
@@ -179,6 +174,8 @@ _underlying_prices = time_table("PT00:00:00.1") \
 
 ############################################################################################################
 # Option price simulation
+#
+# Simulate the price of a set of options based on the underlying securities
 ############################################################################################################
 
 def compute_strikes(open: float) -> npt.NDArray[np.float64]:
@@ -228,6 +225,8 @@ _option_prices = _underlying_prices \
 
 ############################################################################################################
 # Securities
+#
+# Combine the underlying and option securities into a single table
 ############################################################################################################
 
 securities = merge([_underlying_securities, _option_securities])
@@ -237,6 +236,8 @@ _option_securities = None
 
 ############################################################################################################
 # Prices
+#
+# Combine the underlying and option prices into a single table
 ############################################################################################################
 
 
@@ -248,6 +249,8 @@ _option_prices = None
 
 ############################################################################################################
 # Greeks
+#
+# Calculate the greeks for the securites
 ############################################################################################################
 
 greek_history = price_history \
@@ -278,6 +281,8 @@ greek_current = greek_history.last_by(["USym", "Strike", "Expiry", "Parity"])
 
 ############################################################################################################
 # Trade simulation
+#
+# Simulate a series of trades
 ############################################################################################################
 
 def get_random_strike(sym: str) -> float:
@@ -298,6 +303,8 @@ trade_history = time_table("PT00:00:01") \
 
 ############################################################################################################
 # Portfolio
+#
+# Calculate the current portfolio and history
 ############################################################################################################
 
 portfolio_history = trade_history \
@@ -310,6 +317,8 @@ portfolio_current = portfolio_history \
 
 ############################################################################################################
 # Risk
+#
+# Calculate the risk for the portfolio in different ways
 ############################################################################################################
 
 betas = empty_table(1) \
@@ -353,6 +362,8 @@ risk_net = risk_ue \
 
 ############################################################################################################
 # Trade analysis
+#
+# Calculate the PnL for the trades with a 10 minute holding period
 ############################################################################################################
 
 trade_pnl = trade_history \
