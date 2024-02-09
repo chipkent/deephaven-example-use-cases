@@ -1,3 +1,12 @@
+############################################################################################################
+# This example demonstrates how to compute the principal component market factors of a set of stock returns
+# using PCA.  The example uses the deephaven.numpy module to perform the PCA computation using SciKitLearn
+# and the deephaven.table module to create a new table containing the computed factors.
+#
+# NOTE: This example was created using Deephaven Core 0.32.  Support for multidimensional arrays will be
+# added in a coming release.  The example will be updated to use the new features when they are available.
+############################################################################################################
+
 from typing import Sequence, Tuple
 import numpy as np
 import numpy.typing as npt
@@ -27,13 +36,19 @@ def compute_factors(prices: Table, times: Table, symbols: Sequence[str], n_compo
 
     deltas = prices_wide \
         .drop_columns("Timestamp") \
-        .select([f"{sym} = log({sym}) - log({sym}_[ii-1])" for sym in symbols]) \
+        .select([f"{sym} = log({sym}/{sym}_[ii-1])" for sym in symbols]) \
         .where([f"isFinite({sym})" for sym in symbols])
 
     returns = to_numpy(deltas)
 
+    # Subtract the mean
+    demeaned_returns = returns - returns.mean()
+
+    # Normalize
+    Z = demeaned_returns / demeaned_returns.std()
+
     pca = PCA(n_components=n_components)
-    pca.fit(returns)
+    pca.fit(Z)
     pca_components = pca.components_
 
     betas = new_table(
@@ -52,7 +67,7 @@ def compute_factors(prices: Table, times: Table, symbols: Sequence[str], n_compo
 
 date_min = "2024-02-01"
 date_max = "2024-02-08"
-n_components = 4
+n_components = 5
 symbols = [
     'IBM',
     'MSFT',
@@ -82,3 +97,5 @@ times = trades.view("Timestamp=lowerBin(Timestamp,'PT00:10:00'.toNanos())").sele
 
 betas, pct, cum_pct = compute_factors(trades, times, symbols, n_components)
 
+print(f"Explained Variance: {pct}")
+print(f"Cum Explained Variance: {cum_pct}")
