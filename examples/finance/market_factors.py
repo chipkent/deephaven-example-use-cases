@@ -29,10 +29,22 @@ def compute_factors(prices: Table, times: Table, symbols: Sequence[str], n_compo
     Returns:
         A table containing the computed factors, a numpy array of the explained variance ratios, and a numpy array of the cumulative explained variance ratios.
     """
+    symbols = symbols.copy()
     prices_wide = times.view("Timestamp")
 
     for sym in symbols:
-        prices_wide = prices_wide.aj(prices.where("Sym == sym"), ["Timestamp"], f"{sym}=Price")
+        prices_wide = prices_wide \
+            .aj(prices.where("Sym == sym"), ["Timestamp"], f"{sym}=Price") \
+            .update(f"IsOk=isFinite({sym})")
+
+        ok_size = prices_wide.where("IsOk").size
+
+        if ok_size < times.size * 0.9:
+            print(f"Insufficient data for symbol {sym}: {ok_size} of {times.size} valid")
+            prices_wide = prices_wide.drop_columns(sym)
+            symbols.remove(sym)
+
+    prices_wide = prices_wide.drop_columns("IsOk")
 
     deltas = prices_wide \
         .drop_columns("Timestamp") \
@@ -83,6 +95,7 @@ symbols = [
     'LLY',
     'V',
     'XOM',
+    'BADSYM'
 ]
 
 import deephaven.dtypes as dht
