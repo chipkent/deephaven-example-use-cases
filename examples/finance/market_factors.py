@@ -63,14 +63,11 @@ def compute_factors(prices: Table, times: Table, symbols: Sequence[str], n_compo
     # Subtract the mean
     demeaned_returns = returns - returns.mean()
 
-    # Normalize
-    Z = demeaned_returns / demeaned_returns.std()
-
     pca = PCA(n_components=n_components)
-    pca.fit(Z)
+    pca.fit(demeaned_returns)
     pca_components = pca.components_
 
-    betas = new_table(
+    factors = new_table(
         [string_col("Sym", symbols)] +
         [double_col(f"Factor{i}", pca_components[i]) for i in range(n_components)]
     )
@@ -78,13 +75,13 @@ def compute_factors(prices: Table, times: Table, symbols: Sequence[str], n_compo
     pct = pca.explained_variance_ratio_
     cum_pct = np.cumsum(pct)
 
-    return betas, pct, cum_pct
+    return factors, pct, cum_pct
 
 
 
 ## Example usage on Deephaven Enterprise
 
-date_min = "2024-01-01"
+date_min = "2023-07-01"
 date_max = "2024-01-31"
 n_components = 5
 symbols = [
@@ -604,7 +601,7 @@ trades = db.historical_table("FeedOS", "EquityTradeL1_5Min") \
 
 times = trades.view("Timestamp").select_distinct().sort("Timestamp")
 
-betas, pct, cum_pct = compute_factors(trades, times, symbols, n_components)
+factors, pct, cum_pct = compute_factors(trades, times, symbols, n_components)
 
 print(f"Explained Variance: {pct}")
 print(f"Cum Explained Variance: {cum_pct}")
