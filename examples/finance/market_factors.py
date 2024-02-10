@@ -12,12 +12,19 @@ import numpy as np
 import numpy.typing as npt
 from deephaven.numpy import to_numpy
 from sklearn.decomposition import PCA
+from deephaven import merge
 from deephaven.table import Table
 from deephaven.table_factory import new_table
 from deephaven.column import string_col, double_col
 
 
-def compute_factors(prices: Table, times: Table, symbols: Sequence[str], n_components: int) -> Tuple[Table, npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+def compute_factors(
+        prices: Table,
+        times: Table,
+        symbols: Sequence[str],
+        n_components: int,
+        large_move_cutoff: float=0.01,
+) -> Tuple[Table, npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """ Compute the PCA factors for the given symbols and times.
 
     Args:
@@ -25,6 +32,7 @@ def compute_factors(prices: Table, times: Table, symbols: Sequence[str], n_compo
         times: A table containing the times to compute the factors.  Must contain a column "Timestamp".
         symbols: A sequence of symbols to compute the factors for.
         n_components: The number of components to compute.
+        large_move_cutoff: The cutoff for large idiosyncratic moves.  Defaults to 0.01.
 
     Returns:
         A table containing the computed factors, a numpy array of the explained variance ratios, and a numpy array of the cumulative explained variance ratios.
@@ -54,9 +62,22 @@ def compute_factors(prices: Table, times: Table, symbols: Sequence[str], n_compo
     prices_wide = prices_wide.drop_columns("IsOk")
 
     deltas = prices_wide \
-        .drop_columns("Timestamp") \
-        .select([f"{sym} = log({sym}/{sym}_[ii-1])" for sym in symbols]) \
-        .where([f"isFinite({sym})" for sym in symbols])
+        .select(["Timestamp"] + [f"{sym} = log({sym}/{sym}_[ii-1])" for sym in symbols]) \
+        .where([f"isFinite({sym})" for sym in symbols]) \
+        .where("Timestamp - Timestamp_[ii-1] < 8*HOUR") \
+        .drop_columns("Timestamp")
+
+    # Filter out large idiosyncratic moves
+
+    deltas1 = merge([deltas.view(f"Delta=abs({sym})") for sym in symbols]) \
+        .sort_descending("Delta") \
+        .head_pct(large_move_cutoff) \
+        .tail(1)
+
+    delta_cutoff = float(to_numpy(deltas1, ["Delta"])[0])
+
+    deltas = deltas \
+        .where([f"abs({sym}) < delta_cutoff" for sym in symbols]) \
 
     returns = to_numpy(deltas)
 
@@ -82,8 +103,9 @@ def compute_factors(prices: Table, times: Table, symbols: Sequence[str], n_compo
 ## Example usage on Deephaven Enterprise
 
 date_min = "2023-07-01"
+# date_min = "2024-01-28"
 date_max = "2024-01-31"
-n_components = 5
+n_components = 10
 symbols = [
 'MMM',
 'AOS',
