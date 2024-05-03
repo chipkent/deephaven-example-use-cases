@@ -1,14 +1,17 @@
 
-""" A package that provides a CombinedTable class that combines a historical and live table into a single table."""
+""" A package that provides a CombinedTable class that combines a historical and live table into a single table.
 
-from typing import Union, Sequence, Optional, Callable
-from deephaven_enterprise.database import db
-from deephaven import merge
-from deephaven.table import Table, Filter
-from deephaven.time import dh_today
+This class can be used with both the Deephaven client and server.
+"""
+
+from typing import Union, Sequence, Optional, Callable, Generic, TypeVar
+
+Table = TypeVar('Table')
+""" The type of table.  
+By making this a type variable, we can use the CombinedTable class on either the client or server."""
 
 
-class CombinedTable:
+class CombinedTable(Generic[Table]):
     """ A class that combines a historical and live table into a single table.
     This class is used to provide a single interface to both tables.
 
@@ -17,6 +20,7 @@ class CombinedTable:
     """
 
     def __init__(self,
+                 merge: Callable[[Sequence[Table]], Table],
                  hist: Table,
                  live: Table,
                  hist_filters: Sequence[str] = None,
@@ -25,11 +29,13 @@ class CombinedTable:
         """ Create a CombinedTable object.
 
         Args:
+            merge: The function to merge tables.
             hist: The historical table.
             live: The live table.
             hist_filters: The filters to apply to the historical table.
             live_filters: The filters to apply to the live table.
         """
+        self._merge = merge
         self._historical_raw = hist
         self._live_raw = live
         self._hist_filters = hist_filters
@@ -60,14 +66,14 @@ class CombinedTable:
     def combined(self) -> Table:
         """ The combined table."""
         if not self._combined:
-            self._combined = merge([self.historical, self.live])
+            self._combined = self._merge([self.historical, self.live])
 
         return self._combined
 
     @property
     def apply(self) -> 'CombinedTable':
         """ The CombinedTable with the filters fully applied."""
-        return CombinedTable(self.historical, self.live)
+        return CombinedTable(self._merge, self.historical, self.live)
 
     @staticmethod
     def _args_to_table_decorator(fn: Callable) -> Callable:
@@ -103,14 +109,14 @@ class CombinedTable:
             return list(filter1) + list(filter2)
 
     def where(self,
-              filters: Union[str, Filter, Sequence[str], Sequence[Filter]] = None,
+              filters: Union[str, Sequence[str]] = None,
               apply: bool = True,
               ) -> 'CombinedTable':
         """Applies the :meth:`~Table.where` table operation to the combined table, and produces a new CombinedTable.
 
         Args:
-            filters (Union[str, Filter, Sequence[str], Sequence[Filter]], optional): the filter condition
-                expression(s) or Filter object(s), default is None
+            filters (Union[str, Sequence[str]], optional): the filter condition
+                expression(s), default is None
             apply (bool, optional): whether to immediately apply the filters or defer the application until later,
                 default is True
 
@@ -126,27 +132,21 @@ class CombinedTable:
         if not filters:
             return self
 
-        if isinstance(filters, str) or isinstance(filters, Filter):
+        if isinstance(filters, str):
             filters = [filters]
-
-        has_filter = any(isinstance(f, Filter) for f in filters)
-
-        if has_filter:
-            return CombinedTable(
-                self.historical.where(filters),
-                self.live.where(filters),
-            )
 
         hist_filters = self._combine_filters(self._hist_filters, filters)
         live_filters = self._combine_filters(self._live_filters, filters)
 
         if apply:
             return CombinedTable(
+                self._merge,
                 self._historical_raw.where(hist_filters) if hist_filters else self._historical_raw,
                 self._live_raw.where(live_filters) if live_filters else self._live_raw,
             )
         else:
             return CombinedTable(
+                self._merge,
                 self._historical_raw,
                 self._live_raw,
                 hist_filters=hist_filters,
@@ -158,6 +158,7 @@ class CombinedTable:
         and produces a new CombinedTable."""
         print("DELEGATED: where_in")
         return CombinedTable(
+            self._merge,
             self.historical.where_in(filter_table, cols),
             self.live.where_in(filter_table, cols)
         )
@@ -167,50 +168,17 @@ class CombinedTable:
         and produces a new CombinedTable."""
         print("DELEGATED: where_not_in")
         return CombinedTable(
+            self._merge,
             self.historical.where_not_in(filter_table, cols),
             self.live.where_not_in(filter_table, cols)
         )
 
-    def where_one_of(self, filters: Union[str, Filter, Sequence[str], Sequence[Filter]] = None) -> 'CombinedTable':
+    def where_one_of(self, filters: Union[str, Sequence[str]] = None) -> 'CombinedTable':
         """Applies the :meth:`~Table.where_one_of` table operation to the combined table,
         and produces a new CombinedTable."""
         print("DELEGATED: where_one_of")
         return CombinedTable(
+            self._merge,
             self.historical.where_one_of(filters),
             self.live.where_one_of(filters)
         )
-
-
-def combined_table(namespace: str, table_name: str) -> CombinedTable:
-    """ Create a combined table for the given namespace and table name.
-
-    The live table is for today according to deephaven.time.dh_today().
-    The historical table is for all dates less than today.
-
-    Args:
-        namespace: The namespace of the table.
-        table_name: The name of the table.
-
-    Returns:
-        A CombinedTable object.
-    """
-    # noinspection PyUnusedLocal
-    date = dh_today()
-    hist = db.historical_table(namespace, table_name)
-    live = db.live_table(namespace, table_name)
-    return CombinedTable(hist, live, hist_filters=["Date < date"], live_filters=["Date = date"])
-
-
-ct = combined_table("FeedOS", "EquityQuoteL1")
-ct_live = ct.live
-ct_hist = ct.historical
-ct_comb = ct.combined
-# print(ct.is_replay) # Method does not exist
-print(ct.is_blink)
-f1 = ct.where("Date > `2024-04-09`")
-fc1 = f1.combined
-h1 = f1.head(3)
-
-f2 = f1.where("Date < `2024-04-11`")
-fc2 = f2.combined
-h2 = f2.head(3)
