@@ -3,7 +3,7 @@
 
 This class can be used with both the Deephaven client and server.
 """
-
+import inspect
 from typing import Union, Sequence, Optional, Callable, Generic, TypeVar
 
 Table = TypeVar('Table')
@@ -78,9 +78,13 @@ class CombinedTable(Generic[Table]):
     @staticmethod
     def _args_to_table_decorator(fn: Callable) -> Callable:
         """ Decorator to convert function arguments from CombinedTable to Table objects."""
+
+        nargs = len(inspect.signature(fn).parameters)
+
+        if nargs == 0:
+            return fn
+
         def wrapper(*args, **kwargs):
-            # TODO: remove print statements
-            print(f"WRAPPER: {args}")
             args_new = [arg.combined if isinstance(arg, CombinedTable) else arg for arg in args]
             return fn(*args_new, **kwargs)
 
@@ -89,24 +93,35 @@ class CombinedTable(Generic[Table]):
     # If the method doesn't exist in this object, delegate it to the combined table.
     # Methods are called with other CombinedTable objects as arguments, the arguments are converted to Table objects.
     def __getattr__(*args):
-        print(f"GETATTR: {args}")
         obj = args[0]
         fn = args[1]
         c = obj.combined
         f = getattr(c, fn)
+
+        # This is to handle @property methods and properties
+        if not callable(f):
+            return f
+
         return CombinedTable._args_to_table_decorator(f)
 
     @staticmethod
-    def _combine_filters(filter1: Sequence[str], filter2: Sequence[str]) -> Optional[Sequence[str]]:
+    def _combine_filters(filters1: Sequence[str], filters2: Sequence[str]) -> Optional[Sequence[str]]:
         """ Combine two sets of filters. If either filter is None, the other filter is returned."""
-        if not filter1 and not filter2:
+
+        if isinstance(filters1, str):
+            filters1 = [filters1]
+
+        if isinstance(filters2, str):
+            filters2 = [filters2]
+
+        if not filters1 and not filters2:
             return None
-        elif not filter1:
-            return filter2
-        elif not filter2:
-            return filter1
+        elif not filters1:
+            return filters2
+        elif not filters2:
+            return filters1
         else:
-            return list(filter1) + list(filter2)
+            return list(filters1) + list(filters2)
 
     def where(self,
               filters: Union[str, Sequence[str]] = None,
@@ -127,13 +142,8 @@ class CombinedTable(Generic[Table]):
             DHError
         """
 
-        print("DELEGATED: where")
-
         if not filters:
             return self
-
-        if isinstance(filters, str):
-            filters = [filters]
 
         hist_filters = self._combine_filters(self._hist_filters, filters)
         live_filters = self._combine_filters(self._live_filters, filters)
@@ -153,20 +163,26 @@ class CombinedTable(Generic[Table]):
                 live_filters=live_filters,
             )
 
-    def where_in(self, filter_table: Table, cols: Union[str, Sequence[str]]) -> 'CombinedTable':
+    def where_in(self, filter_table: Union[Table, 'CombinedTable'], cols: Union[str, Sequence[str]]) -> 'CombinedTable':
         """Applies the :meth:`~Table.where_in` table operation to the combined table,
         and produces a new CombinedTable."""
-        print("DELEGATED: where_in")
+
+        if isinstance(filter_table, CombinedTable):
+            filter_table = filter_table.combined
+
         return CombinedTable(
             self._merge,
             self.historical.where_in(filter_table, cols),
             self.live.where_in(filter_table, cols)
         )
 
-    def where_not_in(self, filter_table: Table, cols: Union[str, Sequence[str]]) -> 'CombinedTable':
+    def where_not_in(self, filter_table: Union[Table, 'CombinedTable'], cols: Union[str, Sequence[str]]) -> 'CombinedTable':
         """Applies the :meth:`~Table.where_not_in` table operation to the combined table,
         and produces a new CombinedTable."""
-        print("DELEGATED: where_not_in")
+
+        if isinstance(filter_table, CombinedTable):
+            filter_table = filter_table.combined
+
         return CombinedTable(
             self._merge,
             self.historical.where_not_in(filter_table, cols),
@@ -176,7 +192,6 @@ class CombinedTable(Generic[Table]):
     def where_one_of(self, filters: Union[str, Sequence[str]] = None) -> 'CombinedTable':
         """Applies the :meth:`~Table.where_one_of` table operation to the combined table,
         and produces a new CombinedTable."""
-        print("DELEGATED: where_one_of")
         return CombinedTable(
             self._merge,
             self.historical.where_one_of(filters),
