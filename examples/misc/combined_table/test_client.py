@@ -1,10 +1,17 @@
 
-# A script to test combined_table on the server
+# A script to test combined_table on the client
 
-from combined_table_server import combined_table
-from deephaven import empty_table
+from combined_table_client import combined_table
+from deephaven_enterprise.client.session_manager import SessionManager
 
-ct = combined_table("FeedOS", "EquityQuoteL1")
+# For connection details, see: https://deephaven.io/enterprise/docs/coreplus/coreplus-python-client/
+connection_info = "https://hostname:8123/iris/connection.json"
+session_mgr: SessionManager = SessionManager(connection_info)
+session_mgr.private_key("/path-to-private-key/priv-username.base64.txt")
+session = session_mgr.connect_to_new_worker(name=None, heap_size_gb=4.0)
+
+# Begin testing
+ct = combined_table(session, "FeedOS", "EquityQuoteL1")
 ct_live = ct.live
 ct_hist = ct.historical
 ct_comb = ct.combined
@@ -51,7 +58,7 @@ fc6 = f6.combined
 h6 = f6.head(3)
 
 # Test where_not_in with a table
-tf = empty_table(1).update("Date=`2024-04-09`")
+tf = session.empty_table(1).update("Date=`2024-04-09`")
 f7 = f1.where_not_in(tf, "Date")
 fc7 = f7.combined
 h7 = f7.head(3)
