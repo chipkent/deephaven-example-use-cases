@@ -92,17 +92,15 @@ class CombinedTable(Generic[Table]):
 
     # If the method doesn't exist in this object, delegate it to the combined table.
     # Methods are called with other CombinedTable objects as arguments, the arguments are converted to Table objects.
-    def __getattr__(*args):
-        obj = args[0]
-        fn = args[1]
-        c = obj.combined
-        f = getattr(c, fn)
+    def __getattr__(self, attr):
+        c = self.combined
+        a = getattr(c, attr)
 
         # This is to handle @property methods and properties
-        if not callable(f):
-            return f
+        if not callable(a):
+            return a
 
-        return CombinedTable._args_to_table_decorator(f)
+        return CombinedTable._args_to_table_decorator(a)
 
     @staticmethod
     def _combine_filters(filters1: Union[str, Sequence[str]], filters2: Union[str, Sequence[str]]) -> Optional[Sequence[str]]:
