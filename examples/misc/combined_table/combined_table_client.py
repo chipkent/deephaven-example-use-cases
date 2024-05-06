@@ -5,7 +5,7 @@ that combines a historical and live table into a single table.
 See: https://deephaven.io/enterprise/docs/coreplus/coreplus-python-client/
 """
 
-import random
+from uuid import uuid4
 
 from combined_table_common import CombinedTable
 from pydeephaven import Session, Table
@@ -20,7 +20,7 @@ def _db_table(session: Session, namespace: str, table_name: str, is_live: bool) 
         table_name: The name of the table.
         is_live: True for live table, False for historical table.
     """
-    tid = random.randint(0, 1000000)
+    tid = uuid4().int
     session.run_script(
         f"""_temp_{tid} = db.{"live_table" if is_live else "historical_table"}("{namespace}", "{table_name}")"""
     )
