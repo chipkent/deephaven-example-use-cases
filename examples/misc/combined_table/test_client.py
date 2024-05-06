@@ -6,11 +6,13 @@ from deephaven_enterprise.client.session_manager import SessionManager
 
 # For connection details, see: https://deephaven.io/enterprise/docs/coreplus/coreplus-python-client/
 # connection_info = "https://hostname:8123/iris/connection.json"
-connection_info = "https://qa-vplus-java17-cluster-infra-1.int.illumon.com:8000/iris/connection.json"
-connection_info = "https://dh-prod-demo-infra-1.int.illumon.com:8123/iris/connection.json"
 session_mgr: SessionManager = SessionManager(connection_info)
-session_mgr.password("iris", "iris")
+
+# Authenticate
+session_mgr.password("username", "password")
+# -- or --
 # session_mgr.private_key("/path-to-private-key/priv-username.base64.txt")
+
 session = session_mgr.connect_to_new_worker(name=None, heap_size_gb=4.0)
 
 # Begin testing
@@ -76,10 +78,11 @@ f8 = f1.where_not_in(f3, "Date")
 fc8 = f8.combined
 h8 = f8.head(3)
 
-# Test where_one_of
-f9 = f1.where_one_of(["Date=`2024-04-09`", "Date=`2024-04-06`"])
-fc9 = f9.combined
-h9 = f9.head(3)
+# Not yet supported
+# # Test where_one_of
+# f9 = f1.where_one_of(["Date=`2024-04-09`", "Date=`2024-04-06`"])
+# fc9 = f9.combined
+# h9 = f9.head(3)
 
 # Test materializing input CombinedTables
 f10 = f2.natural_join(f2, ["Date", "Timestamp"], ["JAsk=Ask"])
