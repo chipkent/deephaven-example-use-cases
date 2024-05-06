@@ -55,7 +55,7 @@ h4 = f4.head(3)
 assert(f4 == f3)
 
 # Test where_in with a table
-tf = empty_table(1).update("Date=`2024-04-09`")
+tf = session.empty_table(1).update("Date=`2024-04-09`")
 f5 = f1.where_in(tf, "Date")
 fc5 = f5.combined
 h5 = f5.head(3)
