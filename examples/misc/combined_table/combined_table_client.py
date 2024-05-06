@@ -24,8 +24,8 @@ def _db_table(session: Session, namespace: str, table_name: str, is_live: bool) 
     session.run_script(
         f"""_temp_{tid} = db.{"live_table" if is_live else "historical_table"}("{namespace}", "{table_name}")"""
     )
-    t = session.open_table(f"_temp_{id}")
-    session.run_script(f"""del _temp_{id}""")
+    t = session.open_table(f"_temp_{tid}")
+    session.run_script(f"""del _temp_{tid}""")
     return t
 
 

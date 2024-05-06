@@ -5,9 +5,12 @@ from combined_table_client import combined_table
 from deephaven_enterprise.client.session_manager import SessionManager
 
 # For connection details, see: https://deephaven.io/enterprise/docs/coreplus/coreplus-python-client/
-connection_info = "https://hostname:8123/iris/connection.json"
+# connection_info = "https://hostname:8123/iris/connection.json"
+connection_info = "https://qa-vplus-java17-cluster-infra-1.int.illumon.com:8000/iris/connection.json"
+connection_info = "https://dh-prod-demo-infra-1.int.illumon.com:8123/iris/connection.json"
 session_mgr: SessionManager = SessionManager(connection_info)
-session_mgr.private_key("/path-to-private-key/priv-username.base64.txt")
+session_mgr.password("iris", "iris")
+# session_mgr.private_key("/path-to-private-key/priv-username.base64.txt")
 session = session_mgr.connect_to_new_worker(name=None, heap_size_gb=4.0)
 
 # Begin testing
