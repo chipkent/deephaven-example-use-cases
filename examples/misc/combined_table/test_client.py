@@ -30,10 +30,15 @@ f1 = ct.where("Date > `2024-04-09`", apply=False)
 fc1 = f1.combined
 h1 = f1.head(3)
 
-# Test another where with applying
+# Test another where with applying (historical and live already computed)
 f2 = f1.where("Date < `2024-04-11`")
 fc2 = f2.combined
 h2 = f2.head(3)
+
+# Test another where with applying (historical and live not already computed)
+f2a = ct.where("Date > `2024-04-09`", apply=False).where("Date < `2024-04-11`")
+fc2a = f2a.combined
+h2a = f2a.head(3)
 
 # Test a where on an applied table
 f3 = f2.where("Date > `2024-04-01`")
