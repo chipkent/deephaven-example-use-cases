@@ -26,7 +26,7 @@ cta_hist = cta.historical
 cta_comb = cta.combined
 
 # test unspecified method routing
-print(ct.is_blink)
+print(ct.is_refreshing)
 
 # Test a where without applying
 f1 = ct.where("Date > `2024-04-09`", apply=False)
