@@ -105,7 +105,7 @@ class CombinedTable(Generic[Table]):
         return CombinedTable._args_to_table_decorator(f)
 
     @staticmethod
-    def _combine_filters(filters1: Sequence[str], filters2: Sequence[str]) -> Optional[Sequence[str]]:
+    def _combine_filters(filters1: Union[str, Sequence[str]], filters2: Union[str, Sequence[str]]) -> Optional[Sequence[str]]:
         """ Combine two sets of filters. If either filter is None, the other filter is returned."""
 
         if isinstance(filters1, str):
@@ -145,16 +145,24 @@ class CombinedTable(Generic[Table]):
         if not filters:
             return self
 
-        hist_filters = self._combine_filters(self._hist_filters, filters)
-        live_filters = self._combine_filters(self._live_filters, filters)
-
         if apply:
-            return CombinedTable(
-                self._merge,
-                self._historical_raw.where(hist_filters) if hist_filters else self._historical_raw,
-                self._live_raw.where(live_filters) if live_filters else self._live_raw,
-            )
+            if self._historical:
+                hist = self.historical.where(filters)
+            else:
+                hist_filters = self._combine_filters(self._hist_filters, filters)
+                hist = self._historical_raw.where(hist_filters)
+
+            if self._live:
+                live = self.live.where(filters)
+            else:
+                live_filters = self._combine_filters(self._live_filters, filters)
+                live = self._live_raw.where(live_filters)
+
+            return CombinedTable(self._merge, hist, live)
         else:
+            hist_filters = self._combine_filters(self._hist_filters, filters)
+            live_filters = self._combine_filters(self._live_filters, filters)
+
             return CombinedTable(
                 self._merge,
                 self._historical_raw,
