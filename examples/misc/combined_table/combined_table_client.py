@@ -45,4 +45,4 @@ def combined_table(session: Session, namespace: str, table_name: str) -> Combine
     """
     hist = _db_table(session, namespace, table_name, is_live=False)
     live = _db_table(session, namespace, table_name, is_live=True)
-    return CombinedTable(session.merge, hist, live, hist_filters=["Date < today()"], live_filters=["Date = today()"])
+    return CombinedTable(session.merge_tables, hist, live, hist_filters=["Date < today()"], live_filters=["Date = today()"])
