@@ -5,6 +5,7 @@ from combined_table_client import combined_table
 from deephaven_enterprise.client.session_manager import SessionManager
 
 # For connection details, see: https://deephaven.io/enterprise/docs/coreplus/coreplus-python-client/
+
 connection_info = "https://hostname:8123/iris/connection.json"
 session_mgr: SessionManager = SessionManager(connection_info)
 
