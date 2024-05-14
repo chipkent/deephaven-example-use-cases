@@ -7,7 +7,7 @@ from combined_table_common import CombinedTable
 from deephaven_enterprise.database import db
 from deephaven import merge
 
-def combined_table(namespace: str, table_name: str) -> CombinedTable:
+def combined_table(namespace: str, table_name: str, date_col: str="Date") -> CombinedTable:
     """ Create a combined table for the given namespace and table name.
 
     The live table is for today according to `today()`.
@@ -16,11 +16,14 @@ def combined_table(namespace: str, table_name: str) -> CombinedTable:
     Args:
         namespace: The namespace of the table.
         table_name: The name of the table.
+        date_col: The name of the date column.
 
     Returns:
         A CombinedTable object.
     """
     hist = db.historical_table(namespace, table_name)
     live = db.live_table(namespace, table_name)
-    return CombinedTable(merge, hist, live, hist_filters=["Date < today()"], live_filters=["Date = today()"])
+    return CombinedTable(merge, hist, live,
+                         hist_filters=[f"{date_col} < today()"],
+                         live_filters=[f"{date_col} = today()"])
 

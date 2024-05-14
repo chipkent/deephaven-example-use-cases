@@ -29,7 +29,7 @@ def _db_table(session: Session, namespace: str, table_name: str, is_live: bool) 
     return t
 
 
-def combined_table(session: Session, namespace: str, table_name: str) -> CombinedTable:
+def combined_table(session: Session, namespace: str, table_name: str, date_col: str= "Date") -> CombinedTable:
     """ Create a combined table for the given namespace and table name.
 
     The live table is for today according to `today()`.
@@ -39,10 +39,13 @@ def combined_table(session: Session, namespace: str, table_name: str) -> Combine
         session: The session to use.
         namespace: The namespace of the table.
         table_name: The name of the table.
+        date_col: The name of the date column.
 
     Returns:
         A CombinedTable object.
     """
     hist = _db_table(session, namespace, table_name, is_live=False)
     live = _db_table(session, namespace, table_name, is_live=True)
-    return CombinedTable(session.merge_tables, hist, live, hist_filters=["Date < today()"], live_filters=["Date = today()"])
+    return CombinedTable(session.merge_tables, hist, live,
+                         hist_filters=[f"{date_col} < today()"],
+                         live_filters=[f"{date_col} = today()"])
