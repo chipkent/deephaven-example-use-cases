@@ -119,12 +119,12 @@ def black_scholes_rho(s, k, r, t, vol, is_call, is_stock):
 ############################################################################################################
 
 # noinspection PyUnusedLocal
-def simulate_market_data(usyms: list[str], risk_free_rate: float) -> tuple[Table, Table, Table, Table]:
+def simulate_market_data(usyms: list[str], rate_risk_free: float) -> tuple[Table, Table, Table, Table]:
     """ Simulate market data for a set of underlying securities and options.
 
     Args:
         usyms: List of underlying symbols
-        risk_free_rate: The risk-free rate
+        rate_risk_free: The risk-free rate
 
     Returns:
         Tuple of tables containing the simulated securities, price history, trade history, betas
@@ -233,10 +233,11 @@ def simulate_market_data(usyms: list[str], risk_free_rate: float) -> tuple[Table
             "DT = diffYearsAvg(Timestamp, Expiry)",
             "IsStock = Type == `STOCK`",
             "IsCall = Parity == `CALL`",
-            "Bid = black_scholes_price(UBid, Strike, rate_risk_free, DT, VolBid, IsCall, IsStock)",
-            "Ask = black_scholes_price(UAsk, Strike, rate_risk_free, DT, VolAsk, IsCall, IsStock)",
+            "Rf = (double) rate_risk_free",
+            "Bid = black_scholes_price(UBid, Strike, Rf, DT, VolBid, IsCall, IsStock)",
+            "Ask = black_scholes_price(UAsk, Strike, Rf, DT, VolAsk, IsCall, IsStock)",
         ]) \
-        .drop_columns(["DT", "IsStock", "IsCall"])
+        .drop_columns(["Rf", "DT", "IsStock", "IsCall"])
 
     ############################################################################################################
     # Securities
@@ -273,7 +274,7 @@ def simulate_market_data(usyms: list[str], risk_free_rate: float) -> tuple[Table
             "Type = random() < 0.3 ? `STOCK` : `OPTION`",
             "USym = usyms_array[randomInt(0, usyms_array.length)]",
             "Strike = Type == `STOCK` ? NULL_DOUBLE : get_random_strike(USym)",
-            "Expiry = Type == `STOCK` ? null : _expiry_array[randomInt(0, _expiry_array.length)]",
+            "Expiry = Type == `STOCK` ? null : expiry_array[randomInt(0, expiry_array.length)]",
             "Parity = Type == `STOCK` ? null : random() < 0.5 ? `CALL` : `PUT`",
             "TradeSize = randomInt(-1000, 1000)",
         ]) \

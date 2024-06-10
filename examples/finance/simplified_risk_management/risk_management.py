@@ -26,18 +26,19 @@ greek_history = price_history \
         "UMid = (UBid + UAsk) / 2",
         "VolMid = (VolBid + VolAsk) / 2",
         "DT = diffYearsAvg(Timestamp, Expiry)",
+        "Rf = rate_risk_free",
         "IsStock = Type == `STOCK`",
         "IsCall = Parity == `CALL`",
-        "Theo = black_scholes_price(UMid, Strike, rate_risk_free, DT, VolMid, IsCall, IsStock)",
-        "Delta = black_scholes_delta(UBid, Strike, rate_risk_free, DT, VolBid, IsCall, IsStock)",
-        "Gamma = black_scholes_gamma(UBid, Strike, rate_risk_free, DT, VolBid, IsStock)",
-        "Theta = black_scholes_theta(UBid, Strike, rate_risk_free, DT, VolBid, IsCall, IsStock)",
-        "Vega = black_scholes_vega(UBid, Strike, rate_risk_free, DT, VolBid, IsStock)",
-        "Rho = black_scholes_rho(UBid, Strike, rate_risk_free, DT, VolBid, IsCall, IsStock)",
+        "Theo = black_scholes_price(UMid, Strike, Rf, DT, VolMid, IsCall, IsStock)",
+        "Delta = black_scholes_delta(UBid, Strike, Rf, DT, VolBid, IsCall, IsStock)",
+        "Gamma = black_scholes_gamma(UBid, Strike, Rf, DT, VolBid, IsStock)",
+        "Theta = black_scholes_theta(UBid, Strike, Rf, DT, VolBid, IsCall, IsStock)",
+        "Vega = black_scholes_vega(UBid, Strike, Rf, DT, VolBid, IsStock)",
+        "Rho = black_scholes_rho(UBid, Strike, Rf, DT, VolBid, IsCall, IsStock)",
         "UMidUp10 = UMid * 1.1",
         "UMidDown10 = UMid * 0.9",
-        "Up10 = black_scholes_price(UMidUp10, Strike, rate_risk_free, DT, VolMid, IsCall, IsStock)",
-        "Down10 = black_scholes_price(UMidDown10, Strike, rate_risk_free, DT, VolMid, IsCall, IsStock)",
+        "Up10 = black_scholes_price(UMidUp10, Strike, Rf, DT, VolMid, IsCall, IsStock)",
+        "Down10 = black_scholes_price(UMidDown10, Strike, Rf, DT, VolMid, IsCall, IsStock)",
         "JumpUp10 = Up10 - Theo",
         "JumpDown10 = Down10 - Theo",
     ]) \
@@ -81,8 +82,20 @@ risk_all = greek_current \
         "JumpDown10 = JumpDown10 * Position",
     ]) \
     .view([
-        "USym", "Strike", "Expiry", "Parity",
-        "Theo", "DollarDelta", "BetaDollarDelta", "GammaPercent", "VegaPercent", "Theta", "Rho", "JumpUp10", "JumpDown10"])
+        "USym",
+        "Strike",
+        "Expiry",
+        "Parity",
+        "Theo",
+        "DollarDelta",
+        "BetaDollarDelta",
+        "GammaPercent",
+        "VegaPercent",
+        "Theta",
+        "Rho",
+        "JumpUp10",
+        "JumpDown10",
+    ])
 
 risk_ue = risk_all.drop_columns(["Strike", "Parity"]).sum_by(["USym", "Expiry"])
 
@@ -100,7 +113,9 @@ risk_net = risk_ue.drop_columns(["USym", "Expiry"]).sum_by()
 
 trade_pnl = trade_history \
     .view(["Timestamp", "USym", "Strike", "Expiry", "Parity", "TradeSize", "TradePrice"]) \
-    .aj(price_history.update("Timestamp=Timestamp-'PT10m'"), ["USym", "Strike", "Expiry", "Parity", "Timestamp"], ["FutureBid=Bid", "FutureAsk=Ask"]) \
+    .aj(price_history.update("Timestamp=Timestamp-'PT10m'"),
+        ["USym", "Strike", "Expiry", "Parity", "Timestamp"],
+        ["FutureBid=Bid", "FutureAsk=Ask"]) \
     .update([
         "FutureMid = (FutureBid + FutureAsk) / 2",
         "PriceChange = FutureMid - TradePrice",
@@ -110,4 +125,3 @@ trade_pnl = trade_history \
 trade_pnl_by_sym = trade_pnl \
     .view(["USym", "PnL"]) \
     .sum_by("USym")
-
