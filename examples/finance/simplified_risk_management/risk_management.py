@@ -3,7 +3,7 @@
 # _s = Server(port=10000, jvm_args=["-Xmx16g"])
 # _s.start()
 
-from deephaven import time_table, updateby as uby
+from deephaven import time_table, updateby as uby, agg
 from setup_risk_management import simulate_market_data, black_scholes_price, black_scholes_delta, black_scholes_gamma, black_scholes_theta, black_scholes_vega, black_scholes_rho
 
 usyms = ["AAPL", "GOOG", "MSFT", "AMZN", "FB", "TSLA", "NVDA", "INTC", "CSCO", "ADBE", "SPY", "QQQ", "DIA", "IWM", "GLD", "SLV", "USO", "UNG", "TLT", "IEF", "LQD", "HYG", "JNK"]
@@ -98,15 +98,11 @@ risk_all = portfolio_current \
         "JumpDown10",
     ])
 
-risk_ue = risk_all.drop_columns(["Strike", "Parity"]).sum_by(["Account", "USym", "Expiry"])
-
-risk_u = risk_ue.drop_columns("Expiry").sum_by(["Account", "USym"])
-
-risk_e = risk_ue.drop_columns("USym").sum_by(["Account", "Expiry"])
-
-risk_net = risk_ue.drop_columns(["USym", "Expiry"]).sum_by("Account")
-
-risk_firm = risk_net.drop_columns("Account").sum_by()
+risk_roll = risk_all.rollup(
+    aggs=[agg.sum_(["Theo", "DollarDelta", "BetaDollarDelta", "GammaPercent", "VegaPercent", "Theta", "Rho", "JumpUp10", "JumpDown10"])],
+    by=["Account", "USym", "Expiry", "Strike"],
+    include_constituents=False,
+)
 
 ############################################################################################################
 # Trade analysis
