@@ -119,12 +119,13 @@ def black_scholes_rho(s, k, r, t, vol, is_call, is_stock):
 ############################################################################################################
 
 # noinspection PyUnusedLocal
-def simulate_market_data(usyms: list[str], rate_risk_free: float) -> tuple[Table, Table, Table, Table]:
+def simulate_market_data(usyms: list[str], rate_risk_free: float, n_accounts: int = 5) -> tuple[Table, Table, Table, Table]:
     """ Simulate market data for a set of underlying securities and options.
 
     Args:
         usyms: List of underlying symbols
         rate_risk_free: The risk-free rate
+        n_accounts: The number of trading accounts to simulate
 
     Returns:
         Tuple of tables containing the simulated securities, price history, trade history, betas
@@ -271,6 +272,7 @@ def simulate_market_data(usyms: list[str], rate_risk_free: float) -> tuple[Table
 
     trade_history = time_table("PT00:00:01") \
         .update([
+            "Account = `ACCOUNT_` + randomInt(0, n_accounts)",
             "Type = random() < 0.3 ? `STOCK` : `OPTION`",
             "USym = usyms_array[randomInt(0, usyms_array.length)]",
             "Strike = Type == `STOCK` ? NULL_DOUBLE : get_random_strike(USym)",
@@ -279,7 +281,8 @@ def simulate_market_data(usyms: list[str], rate_risk_free: float) -> tuple[Table
             "TradeSize = randomInt(-1000, 1000)",
         ]) \
         .aj(price_history, ["USym", "Strike", "Expiry", "Parity", "Timestamp"], ["Bid", "Ask"]) \
-        .update(["TradePrice = random() < 0.5 ? Bid : Ask"])
+        .update(["TradePrice = random() < 0.5 ? Bid : Ask"]) \
+        .where("!isNull(TradePrice)")
 
     ############################################################################################################
     # Risk betas

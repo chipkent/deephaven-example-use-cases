@@ -26,7 +26,7 @@ greek_history = price_history \
         "UMid = (UBid + UAsk) / 2",
         "VolMid = (VolBid + VolAsk) / 2",
         "DT = diffYearsAvg(Timestamp, Expiry)",
-        "Rf = rate_risk_free",
+        "Rf = (double) rate_risk_free",
         "IsStock = Type == `STOCK`",
         "IsCall = Parity == `CALL`",
         "Theo = black_scholes_price(UMid, Strike, Rf, DT, VolMid, IsCall, IsStock)",
@@ -44,7 +44,7 @@ greek_history = price_history \
     ]) \
     .drop_columns(["UMidUp10", "UMidDown10", "Up10", "Down10"])
 
-greek_current = greek_history.last_by(["USym", "Strike", "Expiry", "Parity"])
+greek_current = greek_history.last_by(["Type", "USym", "Strike", "Expiry", "Parity"])
 
 
 ############################################################################################################
@@ -54,11 +54,11 @@ greek_current = greek_history.last_by(["USym", "Strike", "Expiry", "Parity"])
 ############################################################################################################
 
 portfolio_history = trade_history \
-    .update_by([uby.cum_sum("Position=TradeSize")], ["USym", "Strike", "Expiry", "Parity"])
+    .update_by([uby.cum_sum("Position=TradeSize")], ["Account", "Type", "USym", "Strike", "Expiry", "Parity"])
 
 portfolio_current = portfolio_history \
-    .last_by(["USym", "Strike", "Expiry", "Parity"]) \
-    .view(["USym", "Strike", "Expiry", "Parity", "Position"])
+    .last_by(["Account", "Type", "USym", "Strike", "Expiry", "Parity"]) \
+    .view(["Account", "Type", "USym", "Strike", "Expiry", "Parity", "Position"])
 
 
 ############################################################################################################
@@ -67,8 +67,8 @@ portfolio_current = portfolio_history \
 # Calculate the risk for the portfolio in different ways
 ############################################################################################################
 
-risk_all = greek_current \
-    .natural_join(portfolio_current, ["USym", "Strike", "Expiry", "Parity"]) \
+risk_all = portfolio_current \
+    .natural_join(greek_current, ["Type", "USym", "Strike", "Expiry", "Parity"]) \
     .natural_join(betas, "USym") \
     .update([
         "Theo = Theo * Position",
@@ -82,6 +82,7 @@ risk_all = greek_current \
         "JumpDown10 = JumpDown10 * Position",
     ]) \
     .view([
+        "Account",
         "USym",
         "Strike",
         "Expiry",
@@ -97,13 +98,15 @@ risk_all = greek_current \
         "JumpDown10",
     ])
 
-risk_ue = risk_all.drop_columns(["Strike", "Parity"]).sum_by(["USym", "Expiry"])
+risk_ue = risk_all.drop_columns(["Strike", "Parity"]).sum_by(["Account", "USym", "Expiry"])
 
-risk_u = risk_ue.drop_columns("Expiry").sum_by("USym")
+risk_u = risk_ue.drop_columns("Expiry").sum_by(["Account", "USym"])
 
-risk_e = risk_ue.drop_columns("USym").sum_by("Expiry")
+risk_e = risk_ue.drop_columns("USym").sum_by(["Account", "Expiry"])
 
-risk_net = risk_ue.drop_columns(["USym", "Expiry"]).sum_by()
+risk_net = risk_ue.drop_columns(["USym", "Expiry"]).sum_by("Account")
+
+risk_firm = risk_net.drop_columns("Account").sum_by()
 
 ############################################################################################################
 # Trade analysis
