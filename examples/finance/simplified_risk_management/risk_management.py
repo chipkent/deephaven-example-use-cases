@@ -11,7 +11,25 @@ rate_risk_free = 0.05
 
 securities, price_history, trade_history, betas = simulate_market_data(usyms, rate_risk_free)
 
+############################################################################################################
+# Current security prices
+############################################################################################################
+
 price_current = price_history.last_by(["USym", "Strike", "Expiry", "Parity"])
+
+
+############################################################################################################
+# Portfolio
+#
+# Calculate the current portfolio and history
+############################################################################################################
+
+portfolio_history = trade_history \
+    .update_by([uby.cum_sum("Position=TradeSize")], ["Account", "Type", "USym", "Strike", "Expiry", "Parity"])
+
+portfolio_current = portfolio_history \
+    .last_by(["Account", "Type", "USym", "Strike", "Expiry", "Parity"]) \
+    .view(["Account", "Type", "USym", "Strike", "Expiry", "Parity", "Position"])
 
 
 ############################################################################################################
@@ -45,20 +63,6 @@ greek_history = price_history \
     .drop_columns(["UMidUp10", "UMidDown10", "Up10", "Down10"])
 
 greek_current = greek_history.last_by(["Type", "USym", "Strike", "Expiry", "Parity"])
-
-
-############################################################################################################
-# Portfolio
-#
-# Calculate the current portfolio and history
-############################################################################################################
-
-portfolio_history = trade_history \
-    .update_by([uby.cum_sum("Position=TradeSize")], ["Account", "Type", "USym", "Strike", "Expiry", "Parity"])
-
-portfolio_current = portfolio_history \
-    .last_by(["Account", "Type", "USym", "Strike", "Expiry", "Parity"]) \
-    .view(["Account", "Type", "USym", "Strike", "Expiry", "Parity", "Position"])
 
 
 ############################################################################################################
