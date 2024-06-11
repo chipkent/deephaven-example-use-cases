@@ -2,14 +2,23 @@
 #TODO: document and clean up
 
 from deephaven import time_table, new_table, input_table, DynamicTableWriter
-from deephaven.column import string_col
+from deephaven.column import string_col, double_col
 import deephaven.dtypes as dht
 from deephaven.updateby import ema_time, emstd_time
 from deephaven.plot import Figure, PlotStyle
 from deephaven.plot.selectable_dataset import one_click
 
-max_position_dollars = 10000.0
-ema_decay_time = "PT00:02:00"
+ema_decay_time = "PT00:01:00"
+
+print("==============================================================================================================")
+print("==== Create strategy controls table.")
+print("==============================================================================================================")
+
+controls = input_table(init_table=new_table([
+    string_col("Sym", ["AAPL", "GOOG", "BAC"]),
+    double_col("MaxPositionDollars", [10000.0, 10000.0, 100000.0])
+]), key_cols=["Sym"])
+
 
 print("==============================================================================================================")
 print("==== Create simulated trade and position tables.")
@@ -30,12 +39,10 @@ print("=========================================================================
 print("==== Dynamic table of active securities.")
 print("==============================================================================================================")
 
-active_syms = input_table(init_table=new_table([string_col("Sym", ["AAPL", "GOOG", "BAC"])]))
-
 ticks_bid_ask = db.live_table("FeedOS", "EquityQuoteL1") \
     .view(["Date", "Timestamp", "Sym = LocalCodeStr", "BidPrice=Bid", "BidSize", "AskPrice=Ask", "AskSize"]) \
     .where(["Date = today()", "BidSize > 0", "AskSize > 0"]) \
-    .where_in(active_syms, "Sym")
+    .where_in(controls, "Sym")
 
 print("==============================================================================================================")
 print("==== Compute predictions.")
@@ -77,10 +84,11 @@ print("=========================================================================
 orders = preds.last_by(["Sym"]) \
     .where(f"Timestamp > TimestampFirst + '{ema_decay_time}'") \
     .natural_join(positions, on="Sym", joins="Position") \
+    .natural_join(controls, on="Sym", joins="MaxPositionDollars") \
     .update_view([
         "Position = replaceIfNull(Position, 0.0)",
         "PositionDollars = Position * MidPrice",
-        "MaxPositionDollars = max_position_dollars",
+        "MaxPositionDollars = replaceIfNull(MaxPositionDollars, 0.0)",
         "BuyActive = PositionDollars < MaxPositionDollars",
         "SellActive = PositionDollars > -MaxPositionDollars",
     ])
@@ -103,7 +111,7 @@ def simulate_1_lot(date, timestamp, sym, bid, ask, pred_buy, pred_sell, is_buy_a
     return "NO TRADE"
 
 executions = orders \
-    .snapshot_when(time_table("PT00:01:00"), stamp_cols="SnapTime=Timestamp") \
+    .snapshot_when(time_table("PT00:00:10"), stamp_cols="SnapTime=Timestamp") \
     .update("Size = simulate_1_lot(Date, Timestamp, Sym, BidPrice, AskPrice, PredBuy, PredSell, BuyActive, SellActive)")
 
 print("==============================================================================================================")
