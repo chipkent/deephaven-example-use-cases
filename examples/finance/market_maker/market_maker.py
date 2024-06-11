@@ -5,7 +5,7 @@
 from deephaven import time_table, new_table, input_table, DynamicTableWriter
 from deephaven.column import string_col, double_col
 import deephaven.dtypes as dht
-from deephaven.updateby import ema_time, emstd_time
+from deephaven.updateby import ema_time, emstd_time, cum_min
 from deephaven.plot import Figure, PlotStyle
 from deephaven.plot.selectable_dataset import one_click
 
@@ -63,10 +63,8 @@ preds = ticks_bid_ask \
     .update_view([
         "PredBuy=PredPrice-PredSD",
         "PredSell=PredPrice+PredSD",
-    ])
-
-_preds_start = preds.first_by("Sym").view(["Sym", "Timestamp"])
-preds = preds.natural_join(_preds_start, on="Sym", joins="TimestampFirst=Timestamp")
+    ]) \
+    .update_by([cum_min("TimestampFirst=Timestamp")], by="Sym")
 
 
 ############################################################################################################
@@ -128,11 +126,8 @@ executions = orders \
 # Plot trade executions
 ############################################################################################################
 
-buys = trades.where("Size > 0")
-sells = trades.where("Size < 0")
-
-buys_one_click = one_click(buys, by=["Sym"], require_all_filters=True)
-sells_one_click = one_click(sells, by=["Sym"], require_all_filters=True)
+buys_one_click = one_click(trades.where("Size > 0"), by=["Sym"], require_all_filters=True)
+sells_one_click = one_click(trades.where("Size < 0"), by=["Sym"], require_all_filters=True)
 
 execution_plot = Figure() \
     .plot_xy("BidPrice", t=preds_one_click, x="Timestamp", y="BidPrice") \
