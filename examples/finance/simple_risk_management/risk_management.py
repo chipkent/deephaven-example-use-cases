@@ -8,7 +8,7 @@ import sys
 import tempfile
 import requests
 
-url = "https://raw.githubusercontent.com/chipkent/deephaven-example-use-cases/main/examples/finance/simplified_risk_management/setup_risk_management.py"
+url = "https://raw.githubusercontent.com/chipkent/deephaven-example-use-cases/main/examples/finance/simple_risk_management/setup_risk_management.py"
 tempdir = tempfile.TemporaryDirectory()
 sys.path.insert(0, tempdir.name)
 
