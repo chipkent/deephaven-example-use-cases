@@ -38,7 +38,7 @@ portfolio_current = portfolio_history \
 # Calculate the greeks for the securites
 ############################################################################################################
 
-greek_history = price_history \
+greek_current = price_current \
     .snapshot_when(time_table("PT00:00:05").drop_columns("Timestamp")) \
     .update([
         "UMid = (UBid + UAsk) / 2",
@@ -61,8 +61,6 @@ greek_history = price_history \
         "JumpDown10 = Down10 - Theo",
     ]) \
     .drop_columns(["UMidUp10", "UMidDown10", "Up10", "Down10"])
-
-greek_current = greek_history.last_by(["Type", "USym", "Strike", "Expiry", "Parity"])
 
 
 ############################################################################################################
