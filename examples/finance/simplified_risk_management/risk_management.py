@@ -1,3 +1,21 @@
+# Description: This script demonstrates a simple risk management system for a portfolio of options.
+
+############################################################################################################
+# Install the setup package from GitHub
+############################################################################################################
+
+import sys
+import tempfile
+import requests
+
+url = "https://raw.githubusercontent.com/chipkent/deephaven-example-use-cases/main/examples/finance/simplified_risk_management/setup_risk_management.py"
+tempdir = tempfile.TemporaryDirectory()
+sys.path.insert(0, tempdir.name)
+
+with open(f'{tmpdir}/setup_risk_management.py', 'w') as f:
+    f.write(requests.get(url).text)
+
+############################################################################################################
 
 from deephaven import time_table, updateby as uby, agg
 from deephaven.plot import Figure
