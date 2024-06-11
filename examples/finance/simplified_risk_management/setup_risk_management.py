@@ -8,6 +8,10 @@ from datetime import date, datetime, timedelta
 from deephaven import time_table, empty_table, merge, dtypes as dht
 from deephaven.table import Table
 
+usyms_default = ["AAPL", "GOOG", "MSFT", "AMZN", "FB", "TSLA", "NVDA", "INTC", "CSCO",
+         "ADBE", "SPY", "QQQ", "DIA", "IWM", "GLD", "SLV", "USO", "UNG", "TLT",
+         "IEF", "LQD", "HYG", "JNK"]
+
 ############################################################################################################
 # Black-Scholes
 #
@@ -118,13 +122,13 @@ def black_scholes_rho(s, k, r, t, vol, is_call, is_stock):
 # Simulate market and trading data
 ############################################################################################################
 
-# noinspection PyUnusedLocal
-def simulate_market_data(usyms: list[str], rate_risk_free: float, n_accounts: int = 5) -> tuple[Table, Table, Table, Table]:
+# noinspection PyUnusedLocal,PyDefaultArgument
+def simulate_market_data(rate_risk_free: float, usyms: list[str] = usyms_default, n_accounts: int = 5) -> tuple[Table, Table, Table, Table]:
     """ Simulate market data for a set of underlying securities and options.
 
     Args:
-        usyms: List of underlying symbols
         rate_risk_free: The risk-free rate
+        usyms: List of underlying symbols
         n_accounts: The number of trading accounts to simulate
 
     Returns:
