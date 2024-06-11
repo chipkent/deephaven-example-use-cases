@@ -106,12 +106,16 @@ risk_roll = risk_all.rollup(
 ############################################################################################################
 
 jump = risk_all.view(["USym", "JumpUp10", "JumpDown10"]) \
-    .sum_by("USym") \
-    .sort("USym")
+    .sum_by("USym")
+
+jump_formatted = securities \
+    .select_distinct("USym") \
+    .sort("USym") \
+    .natural_join(jump, "USym")
 
 jump_risk = Figure() \
     .figure_title("Jump Risk") \
-    .plot_cat("Down 10%", jump, "USym", "JumpDown10") \
-    .plot_cat("Up 10%", jump, "USym", "JumpUp10") \
+    .plot_cat("Down 10%", jump_formatted, "USym", "JumpDown10") \
+    .plot_cat("Up 10%", jump_formatted, "USym", "JumpUp10") \
     .show()
 
