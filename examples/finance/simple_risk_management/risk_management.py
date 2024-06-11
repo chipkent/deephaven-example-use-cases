@@ -12,7 +12,7 @@ url = "https://raw.githubusercontent.com/chipkent/deephaven-example-use-cases/ma
 tempdir = tempfile.TemporaryDirectory()
 sys.path.insert(0, tempdir.name)
 
-with open(f'{tmpdir}/setup_risk_management.py', 'w') as f:
+with open(f'{tempdir.name}/setup_risk_management.py', 'w') as f:
     f.write(requests.get(url).text)
 
 ############################################################################################################
