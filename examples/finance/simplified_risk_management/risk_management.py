@@ -1,12 +1,17 @@
 
-# from deephaven_server import Server
-# _s = Server(port=10000, jvm_args=["-Xmx16g"])
-# _s.start()
-
 from deephaven import time_table, updateby as uby, agg
-from setup_risk_management import simulate_market_data, black_scholes_price, black_scholes_delta, black_scholes_gamma, black_scholes_theta, black_scholes_vega, black_scholes_rho
+from deephaven.plot import Figure
 
-usyms = ["AAPL", "GOOG", "MSFT", "AMZN", "FB", "TSLA", "NVDA", "INTC", "CSCO", "ADBE", "SPY", "QQQ", "DIA", "IWM", "GLD", "SLV", "USO", "UNG", "TLT", "IEF", "LQD", "HYG", "JNK"]
+from setup_risk_management import (simulate_market_data,
+                                   black_scholes_price,
+                                   black_scholes_delta,
+                                   black_scholes_gamma,
+                                   black_scholes_theta,
+                                   black_scholes_vega,
+                                   black_scholes_rho)
+
+usyms = ["AAPL", "GOOG", "MSFT", "AMZN", "FB", "TSLA", "NVDA", "INTC", "CSCO", "ADBE", "SPY", "QQQ", "DIA", "IWM",
+         "GLD", "SLV", "USO", "UNG", "TLT", "IEF", "LQD", "HYG", "JNK"]
 rate_risk_free = 0.05
 
 securities, price_history, trade_history, betas = simulate_market_data(usyms, rate_risk_free)
@@ -72,7 +77,12 @@ greek_current = price_current \
 risk_all = portfolio_current \
     .natural_join(greek_current, ["Type", "USym", "Strike", "Expiry", "Parity"]) \
     .natural_join(betas, "USym") \
-    .update([
+    .view([
+        "Account",
+        "USym",
+        "Strike",
+        "Expiry",
+        "Parity",
         "Theo = Theo * Position",
         "DollarDelta = UMid * Delta * Position",
         "BetaDollarDelta = Beta * DollarDelta",
@@ -82,22 +92,6 @@ risk_all = portfolio_current \
         "Rho = Rho * Position",
         "JumpUp10 = JumpUp10 * Position",
         "JumpDown10 = JumpDown10 * Position",
-    ]) \
-    .view([
-        "Account",
-        "USym",
-        "Strike",
-        "Expiry",
-        "Parity",
-        "Theo",
-        "DollarDelta",
-        "BetaDollarDelta",
-        "GammaPercent",
-        "VegaPercent",
-        "Theta",
-        "Rho",
-        "JumpUp10",
-        "JumpDown10",
     ])
 
 risk_roll = risk_all.rollup(
@@ -105,6 +99,22 @@ risk_roll = risk_all.rollup(
     by=["Account", "USym", "Expiry", "Strike"],
     include_constituents=False,
 )
+
+
+############################################################################################################
+# Plot risk
+############################################################################################################
+
+jump = risk_all.view(["USym", "JumpUp10", "JumpDown10"]) \
+    .sum_by("USym") \
+    .sort("USym")
+
+jump_risk = Figure() \
+    .figure_title("Jump Risk") \
+    .plot_cat("Down 10%", jump, "USym", "JumpDown10") \
+    .plot_cat("Up 10%", jump, "USym", "JumpUp10") \
+    .show()
+
 
 ############################################################################################################
 # Trade analysis
