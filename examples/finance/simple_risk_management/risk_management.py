@@ -6,14 +6,15 @@
 
 import sys
 import tempfile
-import requests
+import urllib.request
 
 url = "https://raw.githubusercontent.com/chipkent/deephaven-example-use-cases/main/examples/finance/simple_risk_management/setup_risk_management.py"
 tempdir = tempfile.TemporaryDirectory()
 sys.path.insert(0, tempdir.name)
 
 with open(f'{tempdir.name}/setup_risk_management.py', 'w') as f:
-    f.write(requests.get(url).text)
+    with urllib.request.urlopen(url) as response:
+        f.write(response.read().decode())
 
 ############################################################################################################
 
