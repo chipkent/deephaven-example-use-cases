@@ -1,5 +1,6 @@
-
-#TODO: document and clean up
+# Description: This script simulates a simple stock market maker.
+# It uses an exponential moving average (EMA) to predict the price of a stock and make trades based on the prediction.
+# It requires Deephaven Enterprise to run but can be addapted to Deephaven Community.
 
 from deephaven import time_table, new_table, input_table, DynamicTableWriter
 from deephaven.column import string_col, double_col
@@ -10,9 +11,9 @@ from deephaven.plot.selectable_dataset import one_click
 
 ema_decay_time = "PT00:01:00"
 
-print("==============================================================================================================")
-print("==== Create strategy controls table.")
-print("==============================================================================================================")
+############################################################################################################
+# Create user-modifiable strategy controls table.
+############################################################################################################
 
 controls = input_table(init_table=new_table([
     string_col("Sym", ["AAPL", "GOOG", "BAC"]),
@@ -20,9 +21,11 @@ controls = input_table(init_table=new_table([
 ]), key_cols=["Sym"])
 
 
-print("==============================================================================================================")
-print("==== Create simulated trade and position tables.")
-print("==============================================================================================================")
+############################################################################################################
+# Create simulated trade and position tables.
+#
+# The trades table will be used to record simulated trades.
+############################################################################################################
 
 trades_writer = DynamicTableWriter({
     "Date": dht.string,
@@ -35,18 +38,21 @@ trades = trades_writer.table
 positions = trades.view(["Sym", "Position=Size"]).sum_by("Sym")
 
 
-print("==============================================================================================================")
-print("==== Dynamic table of active securities.")
-print("==============================================================================================================")
+############################################################################################################
+# Get a price feed table
+############################################################################################################
+
+feedos_tables = db.catalog_table().where("Namespace=`FeedOS`")
 
 ticks_bid_ask = db.live_table("FeedOS", "EquityQuoteL1") \
     .view(["Date", "Timestamp", "Sym = LocalCodeStr", "BidPrice=Bid", "BidSize", "AskPrice=Ask", "AskSize"]) \
     .where(["Date = today()", "BidSize > 0", "AskSize > 0"]) \
     .where_in(controls, "Sym")
 
-print("==============================================================================================================")
-print("==== Compute predictions.")
-print("==============================================================================================================")
+
+############################################################################################################
+# Compute predictions
+############################################################################################################
 
 preds = ticks_bid_ask \
     .update_view(["MidPrice=0.5*(BidPrice+AskPrice)"]) \
@@ -59,12 +65,13 @@ preds = ticks_bid_ask \
         "PredSell=PredPrice+PredSD",
     ])
 
-preds_start = preds.first_by("Sym").view(["Sym", "Timestamp"])
-preds = preds.natural_join(preds_start, on="Sym", joins="TimestampFirst=Timestamp")
+_preds_start = preds.first_by("Sym").view(["Sym", "Timestamp"])
+preds = preds.natural_join(_preds_start, on="Sym", joins="TimestampFirst=Timestamp")
 
-print("==============================================================================================================")
-print("==== Plot predictions.")
-print("==============================================================================================================")
+
+############################################################################################################
+# Plot predictions
+############################################################################################################
 
 preds_one_click = one_click(preds, by=["Sym"], require_all_filters=True)
 
@@ -77,9 +84,10 @@ preds_plot = Figure() \
     .plot_xy("PredSell", t=preds_one_click, x="Timestamp", y="PredSell") \
     .show()
 
-print("==============================================================================================================")
-print("==== Generate orders.")
-print("==============================================================================================================")
+
+############################################################################################################
+# Generate orders
+############################################################################################################
 
 orders = preds.last_by(["Sym"]) \
     .where(f"Timestamp > TimestampFirst + '{ema_decay_time}'") \
@@ -94,11 +102,12 @@ orders = preds.last_by(["Sym"]) \
     ])
 
 
-print("==============================================================================================================")
-print("==== Simulate trading.")
-print("==============================================================================================================")
+############################################################################################################
+# Simulate trading
+############################################################################################################
 
 def simulate_1_lot(date, timestamp, sym, bid, ask, pred_buy, pred_sell, is_buy_active, is_sell_active) -> str:
+    """ Simulate a trade of 1 lot based on the current state of the market and predictions. """
 
     if is_buy_active and ask < pred_buy:
         trades_writer.write_row(date, timestamp, sym, ask, 100)
@@ -114,9 +123,10 @@ executions = orders \
     .snapshot_when(time_table("PT00:00:10"), stamp_cols="SnapTime=Timestamp") \
     .update("Size = simulate_1_lot(Date, Timestamp, Sym, BidPrice, AskPrice, PredBuy, PredSell, BuyActive, SellActive)")
 
-print("==============================================================================================================")
-print("==== Plot trade executions.")
-print("==============================================================================================================")
+
+############################################################################################################
+# Plot trade executions
+############################################################################################################
 
 buys = trades.where("Size > 0")
 sells = trades.where("Size < 0")
