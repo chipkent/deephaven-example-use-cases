@@ -115,24 +115,3 @@ jump_risk = Figure() \
     .plot_cat("Up 10%", jump, "USym", "JumpUp10") \
     .show()
 
-
-############################################################################################################
-# Trade analysis
-#
-# Calculate the PnL for the trades with a 10 minute holding period
-############################################################################################################
-
-trade_pnl = trade_history \
-    .view(["Timestamp", "USym", "Strike", "Expiry", "Parity", "TradeSize", "TradePrice"]) \
-    .aj(price_history.update("Timestamp=Timestamp-'PT10m'"),
-        ["USym", "Strike", "Expiry", "Parity", "Timestamp"],
-        ["FutureBid=Bid", "FutureAsk=Ask"]) \
-    .update([
-        "FutureMid = (FutureBid + FutureAsk) / 2",
-        "PriceChange = FutureMid - TradePrice",
-        "PnL = TradeSize * PriceChange",
-    ])
-
-trade_pnl_by_sym = trade_pnl \
-    .view(["USym", "PnL"]) \
-    .sum_by("USym")
