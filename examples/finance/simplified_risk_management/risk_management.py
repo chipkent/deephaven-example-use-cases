@@ -1,6 +1,7 @@
 
 from deephaven import time_table, updateby as uby, agg
 from deephaven.plot import Figure
+from deephaven.table_listener import listen
 
 from setup_risk_management import (simulate_market_data,
                                    black_scholes_price,
@@ -119,3 +120,19 @@ jump_risk = Figure() \
     .plot_cat("Up 10%", jump_formatted, "USym", "JumpUp10") \
     .show()
 
+############################################################################################################
+# Alert on risk
+############################################################################################################
+
+def listener_function(update, is_replay):
+    changes = {**update.added(), **update.modified()}
+
+    if changes:
+        print(f"EXCESSIVE RISK ... SLACK SOMEONE TO DO SOMETHING: usyms={changes['USym']}")
+
+
+jump_alerts = jump.where("JumpDown10 < -30000")
+handle = listen(jump_alerts, listener_function)
+
+# Run handle.stop() to stop the listener
+# Run handle.start() to restart the listener
