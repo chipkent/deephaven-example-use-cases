@@ -11,11 +11,9 @@ from setup_risk_management import (simulate_market_data,
                                    black_scholes_vega,
                                    black_scholes_rho)
 
-usyms = ["AAPL", "GOOG", "MSFT", "AMZN", "FB", "TSLA", "NVDA", "INTC", "CSCO", "ADBE", "SPY", "QQQ", "DIA", "IWM",
-         "GLD", "SLV", "USO", "UNG", "TLT", "IEF", "LQD", "HYG", "JNK"]
 rate_risk_free = 0.05
 
-securities, price_history, trade_history, betas = simulate_market_data(usyms, rate_risk_free)
+securities, price_history, trade_history, betas = simulate_market_data(rate_risk_free)
 
 ############################################################################################################
 # Current security prices
@@ -125,14 +123,19 @@ jump_risk = Figure() \
 ############################################################################################################
 
 def listener_function(update, is_replay):
-    changes = {**update.added(), **update.modified()}
+    over_risk = {**update.added(), **update.modified()}
+    under_risk = update.removed()
 
-    if changes:
-        print(f"EXCESSIVE RISK ... SLACK SOMEONE TO DO SOMETHING: usyms={changes['USym']}")
+    if over_risk:
+        print(f"EXCESSIVE RISK ... SLACK SOMEONE TO DO SOMETHING: usyms={over_risk['USym']}")
+
+    if under_risk:
+        print(f"RISK BACK TO NORMAL: usyms={under_risk['USym']}")
 
 
-jump_alerts = jump.where("JumpDown10 < -30000")
-handle = listen(jump_alerts, listener_function)
+risk_limit = -20000.0
+jump_alerts = jump.where("JumpDown10 < risk_limit")
+handle = listen(jump_alerts, listener_function, do_replay=True)
 
 # Run handle.stop() to stop the listener
 # Run handle.start() to restart the listener
