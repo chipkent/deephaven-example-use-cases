@@ -74,7 +74,7 @@ def compute_factors(
         .head_pct(large_move_cutoff) \
         .tail(1)
 
-    delta_cutoff = float(to_numpy(deltas1, ["Delta"])[0])
+    delta_cutoff = float(to_numpy(deltas1, ["Delta"])[0][0])
 
     deltas = deltas \
         .where([f"abs({sym}) < delta_cutoff" for sym in symbols]) \
