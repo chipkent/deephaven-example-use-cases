@@ -91,3 +91,7 @@ f10 = f2.natural_join(f2, ["Date", "Timestamp"], ["JAsk=Ask"])
 # Test combined join
 f11 = f2.combined_join("natural_join", f2, ["Date", "Timestamp"], ["JAsk=Ask"])
 f12 = f2.combined_join("natural_join", f2.historical, ["Date", "Timestamp"], ["JAsk=Ask"])
+
+# Test combined natural join
+f21 = f2.combined_natural_join(f2, ["Date", "Timestamp"], ["JAsk=Ask"])
+f22 = f2.combined_natural_join(f2.historical, ["Date", "Timestamp"], ["JAsk=Ask"])
