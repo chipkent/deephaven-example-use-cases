@@ -87,3 +87,7 @@ h8 = f8.head(3)
 
 # Test materializing input CombinedTables
 f10 = f2.natural_join(f2, ["Date", "Timestamp"], ["JAsk=Ask"])
+
+# Test combined join
+f11 = f2.combined_join("natural_join", f2, ["Date", "Timestamp"], ["JAsk=Ask"])
+f12 = f2.combined_join("natural_join", f2.historical, ["Date", "Timestamp"], ["JAsk=Ask"])

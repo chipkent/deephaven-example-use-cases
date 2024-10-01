@@ -203,3 +203,43 @@ class CombinedTable(Generic[Table]):
             self.historical.where_one_of(filters),
             self.live.where_one_of(filters)
         )
+
+    def combined_join(self, join_method: str, table: Union[Table, 'CombinedTable'], *args, **kwargs) -> 'CombinedTable':
+        """Applies the specified join method to the combined table and another table,
+        and produces a new CombinedTable.  The join method is specified as a string.
+        Using the combined_join method to join a table retains all partitioning information, 
+        so queries may be faster and more efficient than the equivalent join method.
+
+        If the table is a CombinedTable, the historical tables are joined together and the live tables are joined together.
+        If the table is a Table, the historical table is joined with the other table and the live table is joined with the other table.
+
+        Note that the results are not identical to the join method.
+        The results are the same as if the join method was applied to the historical and live tables separately,
+        and then the results were combined.
+
+        Args:
+            join_method (str): the join method to apply
+            table (Union[Table, CombinedTable]): the table to join with
+            *args: the positional arguments for the join method
+            **kwargs: the keyword arguments for the join method
+
+        Returns:
+            a new CombinedTable object
+        """
+
+        jm = getattr(type(self.historical), join_method)
+
+        if isinstance(table, type(self.historical)):
+            return CombinedTable(
+                self._merge,
+                jm(self.historical, table, *args, **kwargs),
+                jm(self.live, table, *args, **kwargs)
+            )
+        elif isinstance(table, CombinedTable):
+            return CombinedTable(
+                self._merge,
+                jm(self.historical, table.historical, *args, **kwargs),
+                jm(self.live, table.live, *args, **kwargs)
+            )
+        else:
+            raise ValueError(f"Invalid type {type(table)} for argument table")
