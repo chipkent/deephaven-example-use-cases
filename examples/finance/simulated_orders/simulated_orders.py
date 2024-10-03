@@ -29,6 +29,8 @@ class SimulateOrders:
         id: int
         sym: str
         account: str
+        price: float
+        side: str
         state: str
         desired: int
         filled: int
@@ -36,9 +38,11 @@ class SimulateOrders:
     def __init__(self, 
             syms: Sequence[str], 
             accounts: Sequence[str], 
+            prices: Sequence[int],
+            sides: Sequence[str],
             freq_sec_avg: float=1e-2, 
             freq_sec_std: float=1e-2, 
-            prob_new_order: float=0.2, 
+            prob_new_order: float=0.5, 
             prob_cancel: float=0.1, 
             order_sizes: Sequence[int]=[100, 200, 300, 400, 500]
         ):
@@ -47,6 +51,7 @@ class SimulateOrders:
         Args:
             syms: symbols to simulate
             accounts: accounts to simulate
+            prices: prices for each sym and order
             freq_sec_avg: average frequency, in seconds, for updating the state
             freq_sec_std: standard deviation, in seconds, of the frequency for updating the state.
             prob_new_order: probability of creating a new order vs updating an old order
@@ -58,6 +63,8 @@ class SimulateOrders:
         self.freq_sec_std = freq_sec_std
         self.syms = syms
         self.accounts = accounts
+        self.prices = prices
+        self.sides = sides
         self.prob_new_order = prob_new_order
         self.prob_cancel = prob_cancel
         self.order_sizes = order_sizes
@@ -67,6 +74,8 @@ class SimulateOrders:
             "OrderId": dht.int64,
             "Sym": dht.string,
             "Account": dht.string,
+            "Price": dht.double,
+            "Side": dht.string,
             "State": dht.string,
             "Desired": dht.int64,
             "Filled": dht.int64,
@@ -118,10 +127,13 @@ class SimulateOrders:
                     order.state = "PartialFilled" if order.filled < order.desired else "Filled"
         else:
             self._nextId += 1
+            symindex = random.randint(0, len(self.syms) - 1)
             order = self.Order(
                 id = self._nextId,
-                sym = random.choice(self.syms),
+                sym = self.syms[symindex],
                 account = random.choice(self.accounts),
+                price = round(self.prices[symindex] + random.uniform(-1, 1), 2),
+                side = random.choice(self.sides),
                 state = "PendingSubmit",
                 desired = random.choice(self.order_sizes),
                 filled = 0,
@@ -136,6 +148,8 @@ class SimulateOrders:
             long_col("OrderId", [order.id]),
             string_col("Sym", [order.sym]),
             string_col("Account", [order.account]),
+            double_col("Price", [order.price]),
+            string_col("Side", [order.side]),
             string_col("State", [order.state]),
             long_col("Desired", [order.desired]),
             long_col("Filled", [order.filled]),
@@ -144,15 +158,14 @@ class SimulateOrders:
         self._publisher.add(t)
 
 
-syms = ["AAPL", "GOOG", "AMZN"]
-accounts = ["ACCOUNT_1", "ACCOUNT_2"]
-so = SimulateOrders(syms=syms, accounts=accounts)
+syms = ["AAPL", "GOOG", "AMZN", "NVDA", "META"]
+accounts = ["CUSTY_1", "CUSTY_2", "CUSTY_3", "CUSTY_4", "CUSTY_5", "CUSTY_6"]
+prices = [225, 165, 184, 120, 570]
+sides = ["Buy", "Sell"]
+so = SimulateOrders(syms=syms, accounts=accounts, prices=prices, sides=sides)
 so.start()
 
 orders_blink = so.blink_table
 orders_full = so.full_table
 orders_last = orders_full.last_by("OrderId")
 orders_open = orders_last.where("State not in `Filled`, `Canceled`")
-
-
-
