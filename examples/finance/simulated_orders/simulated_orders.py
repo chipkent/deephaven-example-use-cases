@@ -52,6 +52,7 @@ class SimulateOrders:
             syms: symbols to simulate
             accounts: accounts to simulate
             prices: prices for each sym and order
+            sides: sides for each order (buy or sell)
             freq_sec_avg: average frequency, in seconds, for updating the state
             freq_sec_std: standard deviation, in seconds, of the frequency for updating the state.
             prob_new_order: probability of creating a new order vs updating an old order
