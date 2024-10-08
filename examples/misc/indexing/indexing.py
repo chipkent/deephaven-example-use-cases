@@ -31,7 +31,14 @@ t2 = t1.last_by(["I", "J"])
 def add_index(t, by):
     """ Add a data index.  By adding .table, the index calculation is forced to be now instead of when it is first used. """
     print(f"Adding data index: {by}")
-    return time_it("adding index", lambda : data_index(t, by).table)
+
+    def compute_index():
+        idx = data_index(t, by)
+        # call .table to force index computation here
+        idx.table
+        return idx
+
+    return time_it("adding index", compute_index)
 
 def run_test(t):
     """ Runs a series of performance benchmarks. """
