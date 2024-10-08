@@ -34,7 +34,7 @@ def add_index(t, by):
 
     def compute_index():
         idx = data_index(t, by)
-        # call .table to force index computation here
+        # call .table to force index computation here -- to benchmark the index creation separately -- not for production
         idx.table
         return idx
 
