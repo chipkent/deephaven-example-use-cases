@@ -24,8 +24,11 @@ def time_it(name, f):
     print(f"Executed {name} in {(end-start)} sec")
     return rst
 
+mod_i = 100;  mod_j = 7    # low cardinality
+# mod_i = 1000; mod_j = 997  # high cardinality
+
 # Generate a table to analyze.  t is fragmented in the key columns ["I", "J"]
-t1 =  empty_table(100_000_000).update(["I = ii % 1000", "J = ii % 997", "V = random()"])
+t1 =  empty_table(100_000_000).update(["I = ii % mod_i", "J = ii % mod_j", "V = random()"])
 t2 = t1.last_by(["I", "J"])
 
 def add_index(t, by):
