@@ -25,7 +25,7 @@ def time_it(name, f):
     return rst
 
 # Generate a table to analyze.  t is fragmented in the key columns ["I", "J"]
-t1 =  empty_table(100_000_000).update(["I = ii % 100", "J = ii % 7", "V = random()"])
+t1 =  empty_table(100_000_000).update(["I = ii % 1000", "J = ii % 997", "V = random()"])
 t2 = t1.last_by(["I", "J"])
 
 def add_index(t, by):
