@@ -425,7 +425,7 @@ def compute_slippage(trade_history: Table, price_history: Table, holding_period:
 
     return trade_pnl \
         .rollup(
-            aggs=[agg.last("Timestamp"), agg.sum_(["PnL", "TradeSize"]), agg.avg("AvgTradePrice=TradePrice")],
+            aggs=[agg.last("TradeTime=Timestamp"), agg.sum_(["PnL", "TradeSize"]), agg.avg("AvgTradePrice=TradePrice")],
             by=by,
             include_constituents=True,
         )
