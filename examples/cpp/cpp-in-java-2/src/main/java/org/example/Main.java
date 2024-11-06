@@ -1,7 +1,7 @@
 package org.example;
 
 import static org.example.Hello.printHelloWorld2;
-import org.example.BlackScholes;
+import io.deephaven.BlackScholes;
 
 public class Main {
 

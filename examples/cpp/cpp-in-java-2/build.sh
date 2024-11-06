@@ -49,19 +49,21 @@ g++ -dynamiclib -o "$OUTPUT_DIR/libblackscholes.${SUFFIX}" ./src/main/cpp/blacks
 # Compile HelloPreset.java
 javac -cp javacpp.jar -d build src/main/java/org/example/presets/HelloPreset.java
 
-javac -cp javacpp.jar -d build src/main/java/org/example/presets/BlackScholesPreset.java
+javac -cp javacpp.jar -d build src/main/java/io/deephaven/presets/BlackScholesPreset.java
 
 ### Generate Hello.java and JNI Code
 java -cp javacpp.jar:build org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp  org.example.presets.HelloPreset -d build/src/main/java
 javac -cp javacpp.jar:src/main/java -d build/ build/src/main/java/org/example/Hello.java
 java -cp javacpp.jar:build:src/main/java org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp -Dplatform.linkpath=build/${PLATFORM} org.example.Hello -d build/${PLATFORM}
 
-java -cp javacpp.jar:build org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp  org.example.presets.BlackScholesPreset -d build/src/main/java
-javac -cp javacpp.jar:src/main/java -d build/ build/src/main/java/org/example/BlackScholes.java
-java -cp javacpp.jar:build:src/main/java org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp -Dplatform.linkpath=build/${PLATFORM} org.example.BlackScholes -d build/${PLATFORM}
+java -cp javacpp.jar:build org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp  io.deephaven.presets.BlackScholesPreset -d build/src/main/java
+javac -cp javacpp.jar:src/main/java -d build/ build/src/main/java/io/deephaven/BlackScholes.java
+java -cp javacpp.jar:build:src/main/java org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp -Dplatform.linkpath=build/${PLATFORM} io.deephaven.BlackScholes -d build/${PLATFORM}
 
 # Compile Everything
-javac -cp javacpp.jar:src/main/java -d build/ {,build/}src/main/java/org/example/*.java
+javac -cp javacpp.jar:src/main/java -d build/ `find src -name \*.java` `find build/src -name \*.java`
+
+echo "Build successful!"
 
 # Run the Application
 java -Djava.library.path=./build/${PLATFORM} -cp build:javacpp.jar org.example.Main

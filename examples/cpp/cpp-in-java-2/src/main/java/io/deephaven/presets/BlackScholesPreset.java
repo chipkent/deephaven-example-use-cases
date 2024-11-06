@@ -1,10 +1,10 @@
-package org.example.presets;
+package io.deephaven.presets;
 
 import org.bytedeco.javacpp.*;
 import org.bytedeco.javacpp.annotation.*;
 import org.bytedeco.javacpp.tools.*;
 
-@Properties(target="org.example.BlackScholes", value={
+@Properties(target="io.deephaven.BlackScholes", value={
   @Platform(include = "blackscholes.h", link = "blackscholes")
 })
 public class BlackScholesPreset implements InfoMapper {
