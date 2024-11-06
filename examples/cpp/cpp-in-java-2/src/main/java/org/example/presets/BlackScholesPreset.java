@@ -1,0 +1,17 @@
+package org.example.presets;
+
+import org.bytedeco.javacpp.*;
+import org.bytedeco.javacpp.annotation.*;
+import org.bytedeco.javacpp.tools.*;
+
+@Properties(target="org.example.BlackScholes", value={
+  @Platform(include = "blackscholes.h", link = "blackscholes")
+})
+public class BlackScholesPreset implements InfoMapper {
+    static {
+        Loader.load();
+    }
+
+    public void map(InfoMap infoMap) {
+    }
+}

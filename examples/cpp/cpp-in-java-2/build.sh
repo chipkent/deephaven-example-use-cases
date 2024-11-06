@@ -44,16 +44,24 @@ mkdir -p "$OUTPUT_DIR"
 # Build the Shared Library
 g++ -dynamiclib -o "$OUTPUT_DIR/libmyhello.${SUFFIX}" ./src/main/cpp/myhello.cpp
 
+g++ -dynamiclib -o "$OUTPUT_DIR/libblackscholes.${SUFFIX}" ./src/main/cpp/blackscholes.cpp
+
 # Compile HelloPreset.java
 javac -cp javacpp.jar -d build src/main/java/org/example/presets/HelloPreset.java
 
-## Generate Hello.java and JNI Code
+javac -cp javacpp.jar -d build src/main/java/org/example/presets/BlackScholesPreset.java
+
+### Generate Hello.java and JNI Code
 java -cp javacpp.jar:build org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp  org.example.presets.HelloPreset -d build/src/main/java
 javac -cp javacpp.jar:src/main/java -d build/ build/src/main/java/org/example/Hello.java
-java -cp javacpp.jar:build:src/main/java org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp -Dplatform.linkpath=build/macosx-arm64 org.example.Hello -d build/macosx-arm64
+java -cp javacpp.jar:build:src/main/java org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp -Dplatform.linkpath=build/${PLATFORM} org.example.Hello -d build/${PLATFORM}
+
+java -cp javacpp.jar:build org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp  org.example.presets.BlackScholesPreset -d build/src/main/java
+javac -cp javacpp.jar:src/main/java -d build/ build/src/main/java/org/example/BlackScholes.java
+java -cp javacpp.jar:build:src/main/java org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp -Dplatform.linkpath=build/${PLATFORM} org.example.BlackScholes -d build/${PLATFORM}
 
 # Compile Everything
 javac -cp javacpp.jar:src/main/java -d build/ {,build/}src/main/java/org/example/*.java
 
 # Run the Application
-java -Djava.library.path=./build/macosx-arm64/ -cp build:javacpp.jar org.example.Main
+java -Djava.library.path=./build/${PLATFORM} -cp build:javacpp.jar org.example.Main
