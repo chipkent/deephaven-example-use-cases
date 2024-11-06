@@ -42,20 +42,12 @@ OUTPUT_DIR="build/$PLATFORM"
 mkdir -p "$OUTPUT_DIR"
 
 # Build the Shared Library
-g++ -dynamiclib -o "$OUTPUT_DIR/libmyhello.${SUFFIX}" ./src/main/cpp/myhello.cpp
-
 g++ -dynamiclib -o "$OUTPUT_DIR/libblackscholes.${SUFFIX}" ./src/main/cpp/blackscholes.cpp
 
-# Compile HelloPreset.java
-javac -cp javacpp.jar -d ${OUTPUT_DIR} src/main/java/org/example/presets/HelloPreset.java
-
+# Compile BlackScholesPreset
 javac -cp javacpp.jar -d ${OUTPUT_DIR} src/main/java/io/deephaven/presets/BlackScholesPreset.java
 
-### Generate Hello.java and JNI Code
-java -cp javacpp.jar:${OUTPUT_DIR} org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp  org.example.presets.HelloPreset -d ${OUTPUT_DIR}/src/main/java
-javac -cp javacpp.jar:src/main/java -d ${OUTPUT_DIR} ${OUTPUT_DIR}/src/main/java/org/example/Hello.java
-java -cp javacpp.jar:${OUTPUT_DIR}:src/main/java org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp -Dplatform.linkpath=${OUTPUT_DIR} org.example.Hello -d ${OUTPUT_DIR}
-
+### Generate BlackScholes.java and JNI Code
 java -cp javacpp.jar:${OUTPUT_DIR} org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp  io.deephaven.presets.BlackScholesPreset -d ${OUTPUT_DIR}/src/main/java
 javac -cp javacpp.jar:src/main/java -d ${OUTPUT_DIR} ${OUTPUT_DIR}/src/main/java/io/deephaven/BlackScholes.java
 java -cp javacpp.jar:${OUTPUT_DIR}:src/main/java org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp -Dplatform.linkpath=${OUTPUT_DIR} io.deephaven.BlackScholes -d ${OUTPUT_DIR}
@@ -64,10 +56,10 @@ java -cp javacpp.jar:${OUTPUT_DIR}:src/main/java org.bytedeco.javacpp.tools.Buil
 javac -cp javacpp.jar:src/main/java -d ${OUTPUT_DIR} `find src -name \*.java` `find ${OUTPUT_DIR}/src -name \*.java`
 
 # Create a JAR file
-jar cf ${OUTPUT_DIR}/example.jar -C ${OUTPUT_DIR}/ .
+jar cf ${OUTPUT_DIR}/blackscholes.jar -C ${OUTPUT_DIR}/ .
 
 echo "Build successful!"
 
 # Run the Application
 echo "Running a test application..."
-java -Djava.library.path=${OUTPUT_DIR} -cp ${OUTPUT_DIR}/example.jar:javacpp.jar org.example.Main
+java -Djava.library.path=${OUTPUT_DIR} -cp ${OUTPUT_DIR}/blackscholes.jar:javacpp.jar org.example.Main
