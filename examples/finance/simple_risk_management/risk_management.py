@@ -158,3 +158,130 @@ handle = listen(jump_alerts, listener_function, do_replay=True)
 
 # Run handle.stop() to stop the listener
 # Run handle.start() to restart the listener
+
+############################################################################################################
+# Reactive risk UI
+############################################################################################################
+
+from deephaven import ui
+from deephaven.time import to_j_instant
+
+#TODO: memoize
+risk_all_sort = risk_all.sort(["USym", "Expiry", "Strike"])
+risk_all_part = risk_all_sort.partition_by("Account")
+
+jump_account = risk_all.view(["Account", "USym", "JumpUp10", "JumpDown10"]).sum_by(["Account", "USym"])
+
+jump_account_formatted = securities \
+    .select_distinct("USym") \
+    .sort("USym") \
+    .join(jump_account.select_distinct("Account").sort("Account")) \
+    .natural_join(jump_account, ["Account", "USym"]) \
+    .partition_by("Account")
+
+
+@ui.component
+def risk_view():
+    account, set_account = ui.use_state()
+    usym, set_usym = ui.use_state()
+    expiry, set_expiry = ui.use_state()
+
+    #TODO: add select all
+    pick_account = ui.picker(risk_all.select_distinct("Account").sort("Account"), label_column="Account", label="Account", is_selected=account, on_change=set_account)
+    pick_usym = ui.text_field(label="USym", value=usym, on_change=set_usym)
+    #TODO: add select all
+    pick_expiry = ui.picker(risk_all.select_distinct("Expiry").sort("Expiry"), label_column="Expiry", label="Expiry", is_selected=expiry, on_change=set_expiry)
+
+    print(f"DEBUG: {account} {usym} {expiry} {type(expiry)}")
+
+    j_expiry = to_j_instant(int(expiry)) if expiry and expiry != "null" else None
+    risk = risk_all_part.get_constituent([account]) if account else risk_all_sort
+    risk = risk.where("USym = usym") if usym else risk
+    risk = risk.where("Expiry = j_expiry") if expiry else risk
+
+    jump_account_data = jump_account_formatted.get_constituent("Account") if account else jump_formatted
+
+    jump_account_risk = Figure() \
+        .figure_title("Jump Risk") \
+        .plot_cat("Down 10%", jump_account_data, "USym", "JumpDown10") \
+        .plot_cat("Up 10%", jump_account_data, "USym", "JumpUp10") \
+        .show()
+
+
+    # ui.dashboard
+
+    # return [
+    #     # ui.row(ui.stack(ui.panel(risk_roll)), ui.stack(ui.panel(jump_risk))),
+    #     # ui.row(risk_roll, jump_risk, jump_alerts),
+    #     # ui.row(risk_roll, jump_alerts),
+    #     # ui.flex(risk_roll, jump_risk, jump_alerts, direction="row"),
+    #     # ui.flex(risk_roll, jump_alerts, direction="row"),
+    #     # ui.tabs(risk_roll, jump_risk),
+
+    #     risk_roll,
+
+    #     ui.tabs(ui.tab_panels(ui.item(risk_roll), ui.item(risk))),
+
+    #     #TODO: jump_risk
+    #     # ui.tabs(jump_risk, betas),
+
+    #     # jump_account_risk,
+
+    # # ui.row(
+    # #     pick_account,
+    # #     pick_usym,
+    # #     pick_expiry,
+    # # ),
+
+    # # ui.flex(
+    # #     pick_account,
+    # #     pick_usym,
+    # #     pick_expiry,
+    # #     direction="row"
+    # # ),
+
+    # ui.column(
+    #         ui.row(
+    #     pick_account,
+    #     pick_usym,
+    #     pick_expiry,
+    # ),
+    # risk,
+    # # jump_account_risk,
+    # )
+
+    # # risk,
+    # ]
+
+    # return ui.column(
+    #     risk_roll,
+    #     # ui.tabs(ui.tab_panels(ui.item(risk_roll), ui.item(risk))),
+    #     # ui.row(pick_account, pick_usym, pick_expiry),
+    #     betas.where("USym = usym") if usym else betas,
+    #     risk,
+    # )
+
+    return ui.flex(
+        risk_roll,
+        # ui.tabs(ui.tab_panels(ui.item(risk_roll), ui.item(risk))),
+
+        ui.flex(
+            ui.flex(pick_account, pick_usym, pick_expiry, direction="row"),
+            risk,
+            direction="column"
+        ),
+
+        # ui.row(pick_account, pick_usym, pick_expiry),
+        # betas.where("USym = usym") if usym else betas,
+        # risk,
+        direction="column"
+    )
+
+reactive_risk = risk_view()
+
+# jump_alerts # add control table?
+# trades # trades
+
+# betas # betas
+
+
