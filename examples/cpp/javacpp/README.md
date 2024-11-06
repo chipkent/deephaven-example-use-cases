@@ -1,6 +1,6 @@
 # JavaCpp Example 
 
-This is a simple example of using [JavaCpp](https://github.com/bytedeco/javacpp) to call a C++ function from Java.
+This is a simple example using [JavaCpp](https://github.com/bytedeco/javacpp) to call a C++ function from Java.
 [JavaCpp](https://github.com/bytedeco/javacpp) is a tool that makes it easy to wrap C++ code in Java.
 
 For more details on [JavaCpp](https://github.com/bytedeco/javacpp) see [https://github.com/bytedeco/javacpp](https://github.com/bytedeco/javacpp).

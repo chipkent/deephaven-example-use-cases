@@ -89,6 +89,7 @@ double rho(double s, double k, double r, double t, double vol, bool is_call, boo
     }
 }
 
+// This defines the Python module to be created
 PYBIND11_MODULE(blackscholes, m) {
     m.def("norm_cdf", &norm_cdf, "norm_cdf");
     m.def("norm_pdf", &norm_pdf, "norm_pdf");

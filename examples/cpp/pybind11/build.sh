@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# remove any existing virtual environment
+rm -rf venv
+
 # create a virtual environment for the build
 python3.12 -m venv venv
 source venv/bin/activate
