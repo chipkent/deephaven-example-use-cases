@@ -63,7 +63,11 @@ java -cp javacpp.jar:build:src/main/java org.bytedeco.javacpp.tools.Builder -Dpl
 # Compile Everything
 javac -cp javacpp.jar:src/main/java -d build/ `find src -name \*.java` `find build/src -name \*.java`
 
+# Create a JAR file
+jar cf build/${PLATFORM}/example.jar -C build/ .
+
 echo "Build successful!"
 
 # Run the Application
-java -Djava.library.path=./build/${PLATFORM} -cp build:javacpp.jar org.example.Main
+echo "Running a test application..."
+java -Djava.library.path=./build/${PLATFORM} -cp build/${PLATFORM}/example.jar:javacpp.jar org.example.Main

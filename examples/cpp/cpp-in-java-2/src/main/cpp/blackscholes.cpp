@@ -9,7 +9,7 @@ double norm_pdf(double x) {
     return std::exp(-x * x / 2.0) / std::sqrt(2.0 * M_PI);
 }
 
-double black_scholes_price(double s, double k, double r, double t, double vol, bool is_call, bool is_stock) {
+double price(double s, double k, double r, double t, double vol, bool is_call, bool is_stock) {
     if (is_stock) {
         return s;
     }
@@ -24,7 +24,7 @@ double black_scholes_price(double s, double k, double r, double t, double vol, b
     }
 }
 
-double black_scholes_delta(double s, double k, double r, double t, double vol, bool is_call, bool is_stock) {
+double delta(double s, double k, double r, double t, double vol, bool is_call, bool is_stock) {
     if (is_stock) {
         return 1.0;
     }
@@ -38,7 +38,7 @@ double black_scholes_delta(double s, double k, double r, double t, double vol, b
     }
 }
 
-double black_scholes_gamma(double s, double k, double r, double t, double vol, bool is_stock) {
+double gamma(double s, double k, double r, double t, double vol, bool is_stock) {
     if (is_stock) {
         return 0.0;
     }
@@ -48,7 +48,7 @@ double black_scholes_gamma(double s, double k, double r, double t, double vol, b
     return norm_pdf(d1) / (s * vol * std::sqrt(t));
 }
 
-double black_scholes_theta(double s, double k, double r, double t, double vol, bool is_call, bool is_stock) {
+double theta(double s, double k, double r, double t, double vol, bool is_call, bool is_stock) {
     if (is_stock) {
         return 0.0;
     }
@@ -63,7 +63,7 @@ double black_scholes_theta(double s, double k, double r, double t, double vol, b
     }
 }
 
-double black_scholes_vega(double s, double k, double r, double t, double vol, bool is_stock) {
+double vega(double s, double k, double r, double t, double vol, bool is_stock) {
     if (is_stock) {
         return 0.0;
     }
@@ -72,7 +72,7 @@ double black_scholes_vega(double s, double k, double r, double t, double vol, bo
     return s * std::sqrt(t) * norm_pdf(d1);
 }
 
-double black_scholes_rho(double s, double k, double r, double t, double vol, bool is_call, bool is_stock) {
+double rho(double s, double k, double r, double t, double vol, bool is_call, bool is_stock) {
     if (is_stock) {
         return 0.0;
     }
