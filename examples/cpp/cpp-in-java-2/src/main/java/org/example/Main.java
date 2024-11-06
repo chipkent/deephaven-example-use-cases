@@ -1,7 +1,6 @@
-// file: src/main/java/org/example/Main.java
 package org.example;
 
-import static org.example.hello.printHelloWorld2;
+import static org.example.Hello.printHelloWorld2;
 
 public class Main {
 
