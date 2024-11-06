@@ -15,9 +15,17 @@ ext_modules = [
     #     cxx_std=cxx_std,
     # ),
 
+    # Pybind11Extension(
+    #     'example',
+    #     ['example.cpp'],
+    #     include_dirs=[pybind11.get_include()],
+    #     language='c++',
+    #     cxx_std=cxx_std,
+    # ),
+
     Pybind11Extension(
-        'example',
-        ['example.cpp'],
+        'blackscholes',
+        ['src/main/cpp/blackscholes.cpp'],
         include_dirs=[pybind11.get_include()],
         language='c++',
         cxx_std=cxx_std,
@@ -26,6 +34,6 @@ ext_modules = [
 ]
 
 setup(
-    name='example',
+    name='blackscholes',
     ext_modules=ext_modules,
 )

@@ -6,6 +6,7 @@ python3.12 -m venv venv
 source venv/bin/activate
 
 # install the required packages
+python -m pip install --upgrade pip
 python -m pip install pybind11 setuptools wheel
 
 # build the wheel
