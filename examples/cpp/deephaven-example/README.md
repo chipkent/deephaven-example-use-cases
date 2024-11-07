@@ -46,3 +46,15 @@ t = empty_table(10).update([
     "BlackScholesJavaCpp = io.deephaven.BlackScholes.price(UnderlyingPrice, Strke, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
 ])
 ```
+
+# Docker
+
+To build a Docker image with the C++ code, run the following command:
+```bash
+./build_docker.sh
+```
+
+To run the Docker image after building, run the following command:
+```bash
+docker run -it --rm deephaven-example:latest
+```
