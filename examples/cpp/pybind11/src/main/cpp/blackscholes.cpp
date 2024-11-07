@@ -40,7 +40,8 @@ double delta(double s, double k, double r, double t, double vol, bool is_call, b
     }
 }
 
-double gamma(double s, double k, double r, double t, double vol, bool is_stock) {
+// The name "gamma" conflicts on some systems, so using a unique name
+double bs_gamma(double s, double k, double r, double t, double vol, bool is_stock) {
     if (is_stock) {
         return 0.0;
     }
@@ -95,7 +96,7 @@ PYBIND11_MODULE(blackscholes, m) {
     m.def("norm_pdf", &norm_pdf, "norm_pdf");
     m.def("price", &price, "price");
     m.def("delta", &delta, "delta");
-    m.def("gamma", &gamma, "gamma");
+    m.def("gamma", &bs_gamma, "gamma");
     m.def("theta", &theta, "theta");
     m.def("vega", &vega, "vega");
     m.def("rho", &rho, "rho");
