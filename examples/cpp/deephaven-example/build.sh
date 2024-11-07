@@ -18,17 +18,17 @@ pip install deephaven_server
 
 # install the pybind11 example integration
 pushd ../pybind11/
-echo "building pybind11 example integration"
+echo "DEEPHAVEN EXAMPLE: building pybind11 example integration"
 ./build.sh
-echo "installing pybind11 example integration"
+echo "DEEPHAVEN EXAMPLE: installing pybind11 example integration"
 pip install dist/*.whl
 popd
 
 # install the javacpp example integration
 pushd ../javacpp/
-echo "building javacpp example integration"
+echo "DEEPHAVEN EXAMPLE: building javacpp example integration"
 ./build.sh
-echo "installing javacpp example integration"
-mkdir ../deephaven-example/venv/example
-cp build/*/{lib*,*.jar} javacpp.jar ../deephaven-example/venv/example/
 popd
+echo "DEEPHAVEN EXAMPLE: installing javacpp example integration"
+mkdir ./venv/example
+cp ../javacpp/build/*/{lib*,*.jar} ../javacpp/javacpp.jar ./venv/example/

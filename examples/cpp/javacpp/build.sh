@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "removing build/"
+echo "JAVACPP: removing build/"
 rm -rf "build/"
 
 # Detect OS
@@ -26,6 +26,8 @@ esac
 # Combine OS and architecture
 PLATFORM="${OS}-${ARCH}"
 
+echo "JAVACPP: Detected platform: $PLATFORM"
+
 # Determine shared library suffix
 case "$OS" in
     linux)      SUFFIX="so";;
@@ -34,15 +36,23 @@ case "$OS" in
     *)          SUFFIX="unknown";;
 esac
 
-echo "Detected shared library suffix: $SUFFIX"
+echo "JAVACPP: Detected shared library suffix: $SUFFIX"
 
-echo "Detected platform: $PLATFORM"
+# Determine compiler options
+case "$OS" in
+    linux)      COMPILE_OPTS=-shared;;
+    macosx)     COMPILE_OPTS=-dynamiclib;;
+    windows)    COMPILE_OPTS=-shared;;
+    *)          COMPILE_OPTS=-shared;;
+esac
+
+echo "JAVACPP: Detected compiler opts: $COMPILE_OPTS"
 
 OUTPUT_DIR="build/$PLATFORM"
 mkdir -p "$OUTPUT_DIR"
 
 # Build the Shared Library
-g++ -dynamiclib -o "$OUTPUT_DIR/libblackscholes.${SUFFIX}" ./src/main/cpp/blackscholes.cpp
+g++ ${COMPILE_OPTS} -o "$OUTPUT_DIR/libblackscholes.${SUFFIX}" ./src/main/cpp/blackscholes.cpp
 
 # Compile BlackScholesPreset
 javac -cp javacpp.jar -d ${OUTPUT_DIR} src/main/java/io/deephaven/presets/BlackScholesPreset.java
@@ -58,8 +68,8 @@ javac -cp javacpp.jar:src/main/java -d ${OUTPUT_DIR} `find src -name \*.java` `f
 # Create a JAR file
 jar cf ${OUTPUT_DIR}/blackscholes.jar -C ${OUTPUT_DIR}/ .
 
-echo "Build successful!"
+echo "JAVACPP: Build successful!"
 
 # Run the Application
-echo "Running a test application..."
+echo "JAVACPP: Running a test application..."
 java -Djava.library.path=${OUTPUT_DIR} -cp ${OUTPUT_DIR}/blackscholes.jar:javacpp.jar org.example.Main

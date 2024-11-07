@@ -10,7 +10,8 @@ RUN apt-get install -y \
     python3.12 \
     python3.12-venv \
     python3.12-dev \
-    g++
+    g++ \
+    openjdk-11-jdk
 
 COPY ./build /build
 
