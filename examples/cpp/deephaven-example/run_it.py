@@ -10,6 +10,6 @@ t = empty_table(10).update([
     "Vol = 0.4",
     "IsCall = true",
     "IsStock = false",
-    "BlackScholesPythonCpp = blackscholes.price(UnderlyingPrice, Strke, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
+    "BlackScholesPythonCpp = (double) blackscholes.price(UnderlyingPrice, Strke, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
     "BlackScholesJavaCpp = io.deephaven.BlackScholes.price(UnderlyingPrice, Strke, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
 ])
