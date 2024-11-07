@@ -19,9 +19,9 @@ RUN ln -s /build/javacpp /javacpp && ln -s /build/pybind11 /pybind11
 
 RUN cd /build && ./build.sh
 
-RUN echo "source /build/bin/activate" >> /run_example.sh && \
-    echo 'deephaven server --extra-classpath "/build/venv/example/blackscholes.jar /build/venv/example/javacpp.jar" --jvm-args -Djava.library.path=/build/venv/example' >> /run_example.sh && \
+RUN echo "source /build/venv/bin/activate" > /run_example.sh && \
+    echo 'deephaven server --extra-classpath "/build/venv/example/blackscholes.jar /build/venv/example/javacpp.jar" --jvm-args "-Djava.library.path=/build/venv/example -DAuthHandlers=io.deephaven.auth.AnonymousAuthenticationHandler"' >> /run_example.sh && \
     chmod a+x /run_example.sh
 
-CMD /run_example.sh
+CMD bash -C "/run_example.sh"
 

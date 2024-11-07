@@ -56,5 +56,5 @@ To build a Docker image with the C++ code, run the following command:
 
 To run the Docker image after building, run the following command:
 ```bash
-docker run -it --rm deephaven-example:latest
+docker run -it --rm -p 10000:10000 deephaven-example:latest
 ```
