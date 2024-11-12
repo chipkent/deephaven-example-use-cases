@@ -92,12 +92,12 @@ double rho(double s, double k, double r, double t, double vol, bool is_call, boo
 
 // This defines the Python module to be created
 PYBIND11_MODULE(blackscholes, m) {
-    m.def("norm_cdf", &norm_cdf, "norm_cdf");
-    m.def("norm_pdf", &norm_pdf, "norm_pdf");
-    m.def("price", &price, "price");
-    m.def("delta", &delta, "delta");
-    m.def("gamma", &bs_gamma, "gamma");
-    m.def("theta", &theta, "theta");
-    m.def("vega", &vega, "vega");
-    m.def("rho", &rho, "rho");
+    m.def("norm_cdf", &norm_cdf, "Compute norm_cdf");
+    m.def("norm_pdf", &norm_pdf, "Compute norm_pdf");
+    m.def("price", &price, "Compute price");
+    m.def("delta", &delta, "Compute delta");
+    m.def("gamma", &bs_gamma, "Compute gamma");
+    m.def("theta", &theta, "Compute theta");
+    m.def("vega", &vega, "Compute vega");
+    m.def("rho", &rho, "Compute rho");
 }
