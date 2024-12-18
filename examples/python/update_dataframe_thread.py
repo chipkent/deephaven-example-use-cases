@@ -6,7 +6,7 @@ import time
 from deephaven import time_table
 from deephaven.pandas import to_pandas
 
-t = time_table("PT1s").update("X=ii").head(5)
+t = time_table("PT1s").update("X=ii").tail(5)
 df = to_pandas(t)
 
 def update_df(t, interval):
