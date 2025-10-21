@@ -101,23 +101,41 @@ See [examples/options_pricing.py](./examples/options_pricing.py) for a comprehen
 
 ```python
 from deephaven import time_table
+import deephaven.dtypes as dht
 import blackscholes
 
+# Define the stock symbols to simulate
+syms = dht.array(dht.string, ["AAPL", "AMZN", "GOOG", "MSFT", "ORCL"])
+
+# Create a real-time ticking table that updates every second
 t = time_table("PT1S").update([
+    # Cycle through stock symbols
     "Symbol = syms[ (int)(ii % syms.length) ]",
-    "UnderlyingPrice = 100 + (ii % 50) + Math.sin(ii * 0.1) * 10",
+    
+    # Simulate realistic market data
+    "UnderlyingPrice = 100 + (ii % (10 * syms.length)) + Math.sin(ii * 0.1) * 10",
     "Strike = 95",
-    # ... other parameters ...
+    "RiskFree = 0.05",
+    "YearsToExpiry = 0.6",
+    "Vol = 0.3 + (ii % syms.length) * 0.02",
+    "IsCall = randomBool()",  # 50% calls, 50% puts
+    "IsStock = randomDouble(0.0, 1.0) < 0.2",  # 20% stock positions
     
     # pybind11 integration - all Greeks
-    "PricePybind11 = (double) blackscholes.price(...)",
-    "DeltaPybind11 = (double) blackscholes.delta(...)",
-    # ... other Greeks ...
+    "PricePybind11 = (double) blackscholes.price(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
+    "DeltaPybind11 = (double) blackscholes.delta(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
+    "GammaPybind11 = (double) blackscholes.gamma(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsStock)",
+    "ThetaPybind11 = (double) blackscholes.theta(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
+    "VegaPybind11 = (double) blackscholes.vega(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsStock)",
+    "RhoPybind11 = (double) blackscholes.rho(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
     
     # JavaCPP integration - all Greeks  
-    "PriceJavaCpp = io.deephaven.BlackScholes.price(...)",
-    "DeltaJavaCpp = io.deephaven.BlackScholes.delta(...)",
-    # ... other Greeks ...
+    "PriceJavaCpp = io.deephaven.BlackScholes.price(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
+    "DeltaJavaCpp = io.deephaven.BlackScholes.delta(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
+    "GammaJavaCpp = io.deephaven.BlackScholes.gamma(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsStock)",
+    "ThetaJavaCpp = io.deephaven.BlackScholes.theta(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
+    "VegaJavaCpp = io.deephaven.BlackScholes.vega(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsStock)",
+    "RhoJavaCpp = io.deephaven.BlackScholes.rho(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
 ])
 ```
 
