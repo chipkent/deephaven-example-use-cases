@@ -20,7 +20,7 @@ This is **Part 3 of 3** in the C++ integration examples:
 ## Prerequisites
 
 - Java (JDK 17 or later)
-- Python 3.12
+- Python 3.12 or later (configurable via `PYTHON` environment variable)
 - A C++ compiler (g++ or clang)
 
 ## Building Locally
@@ -28,7 +28,7 @@ This is **Part 3 of 3** in the C++ integration examples:
 The build script will compile both integrations and set up a Python virtual environment:
 
 ```bash
-./scripts/build_all.sh
+./build.sh
 ```
 
 This will:
@@ -91,65 +91,66 @@ Both wrappers provide access to the same C++ functions, allowing you to choose t
 
 ## Example Queries
 
-### Basic Usage (pybind11 only)
+### Real-Time Options Pricing
 
-See [examples/basic_usage.py](./examples/basic_usage.py):
+See [examples/options_pricing.py](./examples/options_pricing.py) for a comprehensive example with:
+- Real-time ticking data (updates every second)
+- Multiple stocks (AAPL, AMZN, GOOG, MSFT, ORCL)
+- All Greeks (Price, Delta, Gamma, Theta, Vega, Rho)
+- Side-by-side comparison of pybind11 and JavaCPP
 
 ```python
-from deephaven import empty_table
+from deephaven import time_table
 import blackscholes
 
-t = empty_table(10).update([
-    "UnderlyingPrice = 100 + i",
+t = time_table("PT1S").update([
+    "Symbol = syms[ (int)(ii % syms.length) ]",
+    "UnderlyingPrice = 100 + (ii % 50) + Math.sin(ii * 0.1) * 10",
     "Strike = 95",
-    "Price = (double) blackscholes.price(UnderlyingPrice, Strike, 0.05, 0.6, 0.4, true, false)",
+    # ... other parameters ...
+    
+    # pybind11 integration - all Greeks
+    "PricePybind11 = (double) blackscholes.price(...)",
+    "DeltaPybind11 = (double) blackscholes.delta(...)",
+    # ... other Greeks ...
+    
+    # JavaCPP integration - all Greeks  
+    "PriceJavaCpp = io.deephaven.BlackScholes.price(...)",
+    "DeltaJavaCpp = io.deephaven.BlackScholes.delta(...)",
+    # ... other Greeks ...
 ])
 ```
 
-### Side-by-Side Comparison
-
-See [examples/side_by_side.py](./examples/side_by_side.py):
-
-```python
-from deephaven import empty_table
-import blackscholes
-
-t = empty_table(10).update([
-    "UnderlyingPrice = 100 + i",
-    "Strike = 95",
-    "RiskFree = 0.05",
-    "YearsToExpiry = 0.6",
-    "Vol = 0.4",
-    "IsCall = true",
-    "IsStock = false",
-    # Python/C++ via pybind11
-    "PythonCppPrice = (double) blackscholes.price(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
-    # Java/C++ via JavaCPP
-    "JavaCppPrice = io.deephaven.BlackScholes.price(UnderlyingPrice, Strike, RiskFree, YearsToExpiry, Vol, IsCall, IsStock)",
-])
-```
-
-Both columns should show identical results, demonstrating that both integration methods work correctly!
+Both integrations produce identical results, demonstrating that both methods correctly call the same underlying C++ code!
 
 ## Docker Deployment
 
-Build the Docker image:
+The easiest way to run this example is with Docker Compose:
 
 ```bash
-cd docker
-./build_docker.sh
+docker compose up
 ```
 
-Run the container:
+This will build the image and start the Deephaven server. Access it at http://localhost:10000
 
+After making code changes, rebuild and restart:
 ```bash
-docker run -it --rm -p 10000:10000 deephaven-blackscholes:latest
+docker compose up --build
 ```
 
-Or start a bash shell to explore:
-
+To run in the background:
 ```bash
-docker run -it --rm -p 10000:10000 deephaven-blackscholes:latest bash
+docker compose up -d
+```
+
+To stop:
+```bash
+docker compose down
+```
+
+To start a bash shell for debugging:
+```bash
+docker compose run --rm deephaven-blackscholes bash
 ```
 
 ## Project Structure
@@ -157,15 +158,11 @@ docker run -it --rm -p 10000:10000 deephaven-blackscholes:latest bash
 ```
 03-blackscholes-combined/
 ├── README.md                    # This file
-├── docker/
-│   ├── Dockerfile               # Docker image definition
-│   └── build_docker.sh          # Docker build script
-├── scripts/
-│   └── build_all.sh             # Builds both integrations
-├── examples/
-│   ├── basic_usage.py           # Simple example
-│   └── side_by_side.py          # Compare both approaches
-└── requirements.txt             # Python dependencies
+├── build.sh                     # Builds both integrations
+├── Dockerfile                   # Docker image definition
+├── docker-compose.yml           # Docker Compose configuration
+└── examples/
+    └── options_pricing.py       # Real-time options pricing with multiple stocks
 ```
 
 ## Next Steps

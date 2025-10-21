@@ -1,6 +1,8 @@
 #include "blackscholes.h"
 #include <cmath>
 
+namespace BlackScholes {
+
 double norm_cdf(double x) {
     return (1.0 + std::erf(x / std::sqrt(2.0))) / 2.0;
 }
@@ -86,3 +88,5 @@ double rho(double s, double k, double r, double t, double vol, bool is_call, boo
         return 0.01 * -k * t * std::exp(-r * t) * norm_cdf(-d2);
     }
 }
+
+}  // namespace BlackScholes

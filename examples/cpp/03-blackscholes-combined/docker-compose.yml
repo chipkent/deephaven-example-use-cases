@@ -1,0 +1,27 @@
+# Docker Compose configuration for Black-Scholes Combined Example
+#
+# This compose file builds and runs a Deephaven server with both C++ integration methods:
+# - JavaCPP integration (Query Language can call C++ functions)
+# - pybind11 integration (Python expressions can call C++ functions)
+#
+# Usage:
+#   docker compose up              # Build and run (Ctrl+C to stop)
+#   docker compose up --build      # Force rebuild and run (use after code changes)
+#   docker compose up -d           # Run in background
+#   docker compose down            # Stop and remove container
+#   docker compose build           # Rebuild the image without running
+#
+# Access Deephaven at: http://localhost:10000
+
+services:
+  deephaven-blackscholes:
+    build:
+      context: ..  # Build from cpp examples root to access all examples
+      dockerfile: 03-blackscholes-combined/Dockerfile
+    image: deephaven-blackscholes:latest
+    ports:
+      - "10000:10000"  # Deephaven web UI
+    stdin_open: true   # Keep stdin open (equivalent to -i)
+    tty: true          # Allocate a pseudo-TTY (equivalent to -t)
+    # Uncomment to override the default command (useful for debugging)
+    # command: bash

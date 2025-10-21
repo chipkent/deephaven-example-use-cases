@@ -18,31 +18,41 @@ This is **Part 2 of 3** in the C++ integration examples:
 
 ## About the Implementation
 
-The core Black-Scholes C++ implementation is located in [../shared/blackscholes](../shared/blackscholes/). This example wraps it for use in Python.
+The core Black-Scholes C++ implementation is located in [../shared/blackscholes](../shared/blackscholes/). This example uses pybind11 to create Python bindings that call the shared C++ code.
+
+**Key Architecture Points:**
+- **Separate files**: Implementation (`../shared/blackscholes/`) and bindings (`src/main/cpp/blackscholes_bindings.cpp`) are separate
+- **Shared source**: `setup.py` compiles both the shared C++ code and the bindings together
+- **Clean separation**: Core logic is pure C++, bindings only contain `PYBIND11_MODULE` macro
+- **Namespace binding**: C++ `BlackScholes` namespace functions are bound using `BlackScholes::` prefix
 
 ### How pybind11 Works
 
 ```mermaid
-graph LR
-    A[blackscholes.cpp<br/>C++ Code + Bindings] --> B[PYBIND11_MODULE<br/>Macro]
-    B --> C[setup.py<br/>Build Config]
-    C --> D[setuptools + pybind11<br/>Build System]
-    D --> E[blackscholes.so<br/>Python Extension]
-    E --> F[blackscholes module<br/>Import in Python]
-    F --> G[your_script.py<br/>Your Code]
+graph TB
+    A[../shared/blackscholes/<br/>blackscholes.cpp + .h<br/><i>Shared C++ Code</i>]
+    B[src/main/cpp/<br/>blackscholes_bindings.cpp<br/><i>pybind11 Bindings</i>]
+    
+    A --> C[setup.py<br/><i>Build Configuration</i>]
+    B --> C
+    
+    C --> D[setuptools + pybind11<br/><i>Build System</i>]
+    D --> E[blackscholes.so<br/><i>Python Extension Module</i>]
+    
+    E --> F[import blackscholes<br/><i>Your Python Code</i>]
     
     style A fill:#e1f5ff
-    style B fill:#ffe1e1
+    style B fill:#ffe1f5
     style C fill:#fff4e1
-    style G fill:#e1ffe1
+    style F fill:#e1ffe1
 ```
 
 The pybind11 workflow:
-1. Write C++ code with `PYBIND11_MODULE` macro to define bindings
-2. Create `setup.py` with `Pybind11Extension`
-3. Build system compiles C++ into a Python extension module
-4. Install the wheel file with pip
-5. Import and use from Python with natural syntax
+1. **Write C++ implementation** in shared directory (pure C++, no Python dependencies)
+2. **Create bindings file** with `PYBIND11_MODULE` macro to expose functions to Python
+3. **Configure setup.py** to compile both files together with `Pybind11Extension`
+4. **Build system compiles** C++ into a Python extension module (.so/.pyd file)
+5. **Install and use** - Import the module in Python with natural syntax
 
 ## Resources
 
@@ -63,7 +73,7 @@ To build a wheel file, run the following command:
 
 The build script automatically tests the wheel at the end. You should see output like:
 ```
-BlackScholes Price: 13.270...
+BlackScholes Price: 16.136...
 ```
 
 ## Running
@@ -76,9 +86,25 @@ pip install dist/blackscholes-*.whl
 Then use it in Python:
 ```python
 import blackscholes
-price = blackscholes.price(100, 95, 0.05, 0.6, 0.4, True, False)
-print(f"Price: {price}")
+
+# Calculate call option price and Greeks
+s = 100.0    # Underlying price
+k = 95.0     # Strike price
+r = 0.05     # Risk-free rate (5%)
+t = 0.6      # Time to expiry (0.6 years)
+vol = 0.4    # Volatility (40%)
+
+# Call C++ functions through pybind11 bindings
+price = blackscholes.price(s, k, r, t, vol, True, False)
+delta = blackscholes.delta(s, k, r, t, vol, True, False)
+gamma = blackscholes.gamma(s, k, r, t, vol, False)
+
+print(f"Option Price: {price}")
+print(f"Delta: {delta}")
+print(f"Gamma: {gamma}")
 ```
+
+**Note:** The C++ `BlackScholes::` namespace functions are exposed at the module level (e.g., `blackscholes.price()`).
 
 ## Next Steps
 
