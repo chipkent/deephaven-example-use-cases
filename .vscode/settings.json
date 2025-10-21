@@ -1,5 +1,5 @@
 {
-  // Core servers
+  // Deephaven Core servers
   "deephaven.coreServers": [
     "http://localhost:10000/",
     "http://localhost:10001/",
