@@ -1,6 +1,19 @@
 # C++ Integration Examples
 
-This directory contains examples of integrating C++ code with Deephaven using different approaches. The examples demonstrate Black-Scholes option pricing calculations implemented in C++ and made available through both Java and Python.
+Learn how to integrate high-performance C++ code with Deephaven for real-time data processing.
+
+## Overview
+
+These examples demonstrate how to wrap C++ code so it can be called from both Deephaven's query language (Java) and Python expressions. Using the Black-Scholes option pricing model as a practical example, you'll learn two integration approaches:
+
+1. **JavaCPP** - Call C++ functions directly in Deephaven queries
+2. **pybind11** - Call C++ functions in Python scripts and expressions
+
+**Why integrate C++ with Deephaven?**
+- **Performance**: Native C++ speed for computationally intensive operations
+- **Reuse**: Leverage existing C++ libraries and codebases
+- **Flexibility**: Choose Java or Python integration based on your needs
+- **Real-time**: Process streaming data with native code performance
 
 ## Structure
 
@@ -9,53 +22,86 @@ This directory contains examples of integrating C++ code with Deephaven using di
 
 ### Examples (in recommended learning order)
 
-#### 1. [01-blackscholes-javacpp](./01-blackscholes-javacpp/)
-Learn how to integrate C++ code with Java using JavaCPP. This example shows:
-- Wrapping C++ functions for use in Java
-- Building and packaging with JavaCPP
-- Calling C++ from Java code
+#### 1. [01-blackscholes-javacpp](./01-blackscholes-javacpp/) - JavaCPP Integration
+Wrap C++ code for use in Deephaven's query language (Java/Groovy).
 
-**Start here** if you want to use C++ in Deephaven's query language.
+**What you'll learn:**
+- Using JavaCPP to create Java bindings for C++ functions
+- Building and packaging C++ code as JAR files
+- Calling C++ from Deephaven queries with `io.deephaven.BlackScholes.price(...)`
 
-#### 2. [02-blackscholes-pybind11](./02-blackscholes-pybind11/)
-Learn how to integrate C++ code with Python using pybind11. This example shows:
-- Creating Python bindings for C++ functions
+**Best for:** Using C++ in table operations and query expressions
+
+#### 2. [02-blackscholes-pybind11](./02-blackscholes-pybind11/) - pybind11 Integration
+Wrap C++ code for use in Python scripts and expressions.
+
+**What you'll learn:**
+- Using pybind11 to create Python bindings for C++ functions
 - Building Python wheels with C++ extensions
-- Calling C++ from Python code
+- Calling C++ from Python with `blackscholes.price(...)`
 
-**Start here** if you want to use C++ in Python scripts that interact with Deephaven.
+**Best for:** Using C++ in Python scripts, notebooks, and Python expressions
 
-#### 3. [03-blackscholes-combined](./03-blackscholes-combined/)
-See both integration methods working together in a running Deephaven server. This example shows:
-- Using JavaCPP-wrapped C++ in Deephaven queries
-- Using pybind11-wrapped C++ in Python expressions
-- Comparing performance and usage patterns
+#### 3. [03-blackscholes-combined](./03-blackscholes-combined/) - Complete Example
+See both integrations working together in a live Deephaven server.
+
+**What you'll learn:**
+- Running Deephaven with both C++ integrations
+- Real-time options pricing with multiple stocks
+- Side-by-side comparison of both approaches
 - Docker deployment
 
-**Start here** if you want to see the complete picture.
+**Best for:** Understanding the complete picture and seeing real-world usage
 
 ## Quick Start
 
+### Option 1: Try Individual Examples
+
 ```bash
-# Build and test JavaCPP integration
+# Test JavaCPP integration (builds and runs a simple test)
 cd 01-blackscholes-javacpp
 ./build.sh
 
-# Build and test pybind11 integration
+# Test pybind11 integration (builds and runs a simple test)
 cd ../02-blackscholes-pybind11
 ./build.sh
-
-# Run combined example with Deephaven
-cd ../03-blackscholes-combined
-./scripts/build_all.sh
-source venv/bin/activate
-deephaven server --extra-classpath "./venv/example/blackscholes.jar ./venv/example/javacpp.jar" --jvm-args "-Djava.library.path=./venv/example -DAuthHandlers=io.deephaven.auth.AnonymousAuthenticationHandler"
-
-# Or use Docker
-cd docker
-./build_docker.sh
-docker run -it --rm -p 10000:10000 deephaven-blackscholes:latest
 ```
+
+### Option 2: Run Complete Deephaven Example
+
+```bash
+# Build both integrations and start Deephaven server
+cd 03-blackscholes-combined
+./build.sh
+source venv/bin/activate
+
+# Start Deephaven with C++ integrations loaded
+deephaven server \
+  --extra-classpath "./venv/example/blackscholes.jar ./venv/example/javacpp.jar" \
+  --jvm-args "-Djava.library.path=./venv/example -DAuthHandlers=io.deephaven.auth.AnonymousAuthenticationHandler"
+
+# Open http://localhost:10000 in your browser
+# Then run: exec(open('examples/options_pricing.py').read())
+```
+
+### Option 3: Use Docker (Easiest)
+
+```bash
+cd 03-blackscholes-combined
+docker compose up
+
+# Open http://localhost:10000 in your browser
+# The example script is already loaded
+```
+
+## What the Example Does
+
+The examples implement **Black-Scholes option pricing** - a mathematical model for calculating the theoretical price of financial options. The C++ implementation calculates:
+
+- **Option Price** - Fair value of call/put options
+- **Greeks** - Risk metrics (Delta, Gamma, Theta, Vega, Rho)
+
+The combined example demonstrates **real-time options pricing** for multiple stocks (AAPL, AMZN, GOOG, MSFT, ORCL) with data updating every second, showing both C++ integration methods producing identical results side-by-side.
 
 ## Architecture
 
@@ -89,7 +135,7 @@ graph TD
 ## Prerequisites
 
 - Java (JDK 17 or later)
-- Python 3.12
+- Python 3.12 or later (configurable via `PYTHON` environment variable)
 - A C++ compiler (g++, clang, or MSVC)
 - Docker (optional, for containerized deployment)
 
