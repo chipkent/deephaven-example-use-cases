@@ -1,0 +1,11 @@
+# pyproject.toml - Python project metadata and build configuration
+#
+# This file specifies build dependencies for the pybind11 Black-Scholes module.
+# Required for modern Python packaging (PEP 517/518) when using `python -m build`.
+#
+# The build system needs pybind11 to be available during the build process
+# to compile the C++ extension module.
+
+[build-system]
+requires = ["setuptools", "wheel", "pybind11"]
+build-backend = "setuptools.build_meta"
