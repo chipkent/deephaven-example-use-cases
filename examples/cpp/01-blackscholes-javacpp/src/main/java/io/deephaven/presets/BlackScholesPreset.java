@@ -5,7 +5,11 @@ import org.bytedeco.javacpp.annotation.*;
 import org.bytedeco.javacpp.tools.*;
 
 @Properties(target="io.deephaven.BlackScholes", value={
-  @Platform(include = "blackscholes.h", link = "blackscholes")
+  @Platform(
+    includepath = "../../../../shared/blackscholes",
+    include = "blackscholes.h",
+    link = "blackscholes"
+  )
 })
 public class BlackScholesPreset implements InfoMapper {
     static {

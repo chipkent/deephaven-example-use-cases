@@ -51,16 +51,18 @@ echo "JAVACPP: Detected compiler opts: $COMPILE_OPTS"
 OUTPUT_DIR="build/$PLATFORM"
 mkdir -p "$OUTPUT_DIR"
 
-# Build the Shared Library
-g++ ${COMPILE_OPTS} -o "$OUTPUT_DIR/libblackscholes.${SUFFIX}" ./src/main/cpp/blackscholes.cpp
+# Build the Shared Library from shared source
+# Compile the shared Black-Scholes implementation directly
+g++ ${COMPILE_OPTS} -o "$OUTPUT_DIR/libblackscholes.${SUFFIX}" ../shared/blackscholes/blackscholes.cpp
 
 # Compile BlackScholesPreset
 javac -cp javacpp.jar -d ${OUTPUT_DIR} src/main/java/io/deephaven/presets/BlackScholesPreset.java
 
 ### Generate BlackScholes.java and JNI Code
-java -cp javacpp.jar:${OUTPUT_DIR} org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp  io.deephaven.presets.BlackScholesPreset -d ${OUTPUT_DIR}/src/main/java
+# Use the shared blackscholes header for parsing
+java -cp javacpp.jar:${OUTPUT_DIR} org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=../shared/blackscholes  io.deephaven.presets.BlackScholesPreset -d ${OUTPUT_DIR}/src/main/java
 javac -cp javacpp.jar:src/main/java -d ${OUTPUT_DIR} ${OUTPUT_DIR}/src/main/java/io/deephaven/BlackScholes.java
-java -cp javacpp.jar:${OUTPUT_DIR}:src/main/java org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=src/main/cpp -Dplatform.linkpath=${OUTPUT_DIR} io.deephaven.BlackScholes -d ${OUTPUT_DIR}
+java -cp javacpp.jar:${OUTPUT_DIR}:src/main/java org.bytedeco.javacpp.tools.Builder -Dplatform.includepath=../shared/blackscholes -Dplatform.linkpath=${OUTPUT_DIR} io.deephaven.BlackScholes -d ${OUTPUT_DIR}
 
 # Compile Everything
 javac -cp javacpp.jar:src/main/java -d ${OUTPUT_DIR} `find src -name \*.java` `find ${OUTPUT_DIR}/src -name \*.java`

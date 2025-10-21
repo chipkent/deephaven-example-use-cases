@@ -10,8 +10,14 @@ from pybind11.setup_helpers import Pybind11Extension
 ext_modules = [
     Pybind11Extension(
         'blackscholes',
-        ['src/main/cpp/blackscholes.cpp'],
-        include_dirs=[pybind11.get_include()],
+        [
+            '../shared/blackscholes/blackscholes.cpp',      # Shared implementation
+            'src/main/cpp/blackscholes_bindings.cpp'        # Python bindings
+        ],
+        include_dirs=[
+            pybind11.get_include(),
+            '../shared/blackscholes'                        # For blackscholes.h
+        ],
         language='c++',
         cxx_std=cxx_std,
     ),

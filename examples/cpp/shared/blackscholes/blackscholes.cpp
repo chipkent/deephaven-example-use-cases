@@ -1,5 +1,5 @@
+#include "blackscholes.h"
 #include <cmath>
-#include <vector>
 
 double norm_cdf(double x) {
     return (1.0 + std::erf(x / std::sqrt(2.0))) / 2.0;
