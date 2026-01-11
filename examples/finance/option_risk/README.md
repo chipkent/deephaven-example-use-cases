@@ -1,22 +1,68 @@
 # Option Risk System Example
 
-This is an example of a simple option risk system. 
-The system is designed to calculate the risk of an option and stock position based on the Greeks of the position. 
-The Greeks are calculated using the Black-Scholes model.
+This example demonstrates a comprehensive option risk management system that calculates portfolio risk metrics using the Black-Scholes model to compute option Greeks and analyze exposure.
 
-The system is implemented in Python and uses the [`numpy`](https://numpy.org/) library for numerical calculations.
-The Python [`numba`](https://deephaven.io/core/docs/how-to-guides/use-numba/) library is used to speed up the option model calculations.
+## Overview
 
-The example can be run in one of two ways:
-1. All code is combined into [./option_risk_combined.py](./option_risk_combined.py) and can be run as a single script.  This is a long file and can be more difficult to follow during a demo.
-2. The code is broken down into smaller parts that can be run separately.  The smaller pieces can make the code easier to follow during a demo. Execute the files sequentially in the following order:
-   1. [./option_risk_0_option_model.py](./option_risk_0_option_model.py) - The option model
-   2. [./option_risk_1_sec_master.py](./option_risk_1_sec_master.py) - Simulate a security master
-   3. [./option_risk_2_betas.py](./option_risk_2_betas.py) - Simulate betas
-   4. [./option_risk_3_market_prices.py](./option_risk_3_market_prices.py) - Simulate market prices
-   5. [./option_risk_4_trades.py](./option_risk_4_trades.py) - Simulate trades
-   6. [./option_risk_5_greeks.py](./option_risk_5_greeks.py) - Compute greeks
-   7. [./option_risk_6_risk.py](./option_risk_6_risk.py) - Compute risk
-   8. [./option_risk_7_risk_rollup.py](./option_risk_7_risk_rollup.py) - Compute risk rollup
-   9. [./option_risk_9_slippage.py](./option_risk_9_slippage.py) - Compute execution slippage
-   9. [./option_risk_8_main.py](./option_risk_9_main.py) - Main
+The system simulates a trading environment with stocks and options, then calculates various risk measures:
+
+- **Greeks**: Delta, Gamma, Theta, Vega, and Rho calculated using Black-Scholes
+- **Portfolio Risk**: Aggregated risk metrics across all positions
+- **Risk Rollup**: Hierarchical risk aggregation by symbol, expiration, strike, and parity
+- **Slippage Analysis**: Post-trade price movement analysis to measure execution quality
+
+## Implementation Details
+
+The system uses:
+
+- **Black-Scholes Model**: Industry-standard option pricing formulas
+- **[`numpy`](https://numpy.org/)**: For numerical array operations
+- **[`numba`](https://deephaven.io/core/docs/how-to-guides/use-numba/)**: JIT compilation for high-performance Greeks calculations
+
+## Running the Example
+
+The example can be run in two ways:
+
+### Option 1: Combined Script (Recommended for Quick Start)
+
+Execute [./option_risk_combined.py](./option_risk_combined.py) as a single script containing all functionality. This is a longer file but runs everything at once.
+
+### Option 2: Step-by-Step Modules (Recommended for Learning/Demos)
+
+Execute the files sequentially to see each component build up the system:
+
+1. [./option_risk_0_option_model.py](./option_risk_0_option_model.py) - Black-Scholes pricing and Greeks functions
+2. [./option_risk_1_sec_master.py](./option_risk_1_sec_master.py) - Security master table with stocks and options
+3. [./option_risk_2_betas.py](./option_risk_2_betas.py) - Beta coefficients for market correlation
+4. [./option_risk_3_market_prices.py](./option_risk_3_market_prices.py) - Real-time simulated market data
+5. [./option_risk_4_trades.py](./option_risk_4_trades.py) - Simulated trading activity
+6. [./option_risk_5_greeks.py](./option_risk_5_greeks.py) - Greeks calculation for all securities
+7. [./option_risk_6_risk.py](./option_risk_6_risk.py) - Portfolio risk metrics
+8. [./option_risk_7_risk_rollup.py](./option_risk_7_risk_rollup.py) - Hierarchical risk aggregation
+9. [./option_risk_8_slippage.py](./option_risk_8_slippage.py) - Execution slippage analysis
+10. [./option_risk_9_main.py](./option_risk_9_main.py) - Orchestrates all components
+
+## Output Tables
+
+### Simulated Market Data
+
+- **`sec_master`**: Master table of stocks and options with strikes and expiries
+- **`betas`**: Beta coefficients for correlating risk to market movements
+- **`prices_history`**: Real-time simulated bid/ask prices and volatility
+- **`prices_current`**: Latest prices for all securities
+- **`trade_history`**: Simulated trades with execution prices
+- **`portfolio_history`**: Position changes over time
+- **`portfolio_current`**: Current net positions
+
+### Risk Analytics
+
+- **`greeks_current`**: Current Greeks (Delta, Gamma, Theta, Vega, Rho) for all securities
+- **`risk_all`**: Detailed risk breakdown for each position, including:
+  - Theoretical value (Theo)
+  - Dollar delta and beta-adjusted delta
+  - Gamma (in percentage terms)
+  - Theta (time decay)
+  - Vega (volatility sensitivity)
+  - Jump risk (up/down 10% scenarios)
+- **`risk_rollup`**: Hierarchical rollup table aggregating risk by symbol, expiration, strike, and parity
+- **`slippage`**: Post-trade analysis showing price movement after execution

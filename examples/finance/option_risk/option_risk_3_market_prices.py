@@ -1,5 +1,18 @@
+""" Simulate real-time market prices for stocks and options.
 
-""" Simulate market prices for a given set of underlyings and a security master table """
+This module generates continuous streaming market data including:
+- Bid/ask prices for underlying stocks
+- Implied volatility (bid/ask spread)
+- Option prices calculated from Black-Scholes model
+
+The simulation:
+1. Generates random walk price movements for underlying stocks
+2. Simulates volatility changes over time
+3. Calculates option prices using the Black-Scholes model with simulated inputs
+4. Creates bid/ask spreads for both stocks and options
+
+This produces realistic ticking market data for demonstrating real-time risk calculations.
+"""
 
 import numpy as np
 
@@ -7,7 +20,10 @@ from deephaven import empty_table, time_table, merge, dtypes as dht
 from deephaven.table import Table
 
 def simulate_market_prices(underlyings: dict[str, float], sec_master: Table, update_interval: str, rate_risk_free: float) -> Table:
-    """ Simulate market prices for a given set of underlyings and a security master table """
+    """ Simulate streaming market prices.
+    
+    Returns a ticking table with real-time bid/ask prices and volatility for all securities.
+    """
 
     usyms_array = dht.array(dht.string, list(underlyings.keys()))
     last_price = {usym: round(np.abs(np.random.normal(open, 30.0)), 2) for usym, open in underlyings.items()}

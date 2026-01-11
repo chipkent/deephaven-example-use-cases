@@ -1,5 +1,24 @@
+""" Compute option Greeks and jump risk scenarios.
 
-""" Compute the greeks for the securities """
+This module calculates:
+
+1. **Standard Greeks** - Sensitivity measures for options:
+   - Theo: Theoretical fair value from Black-Scholes
+   - Delta: Price sensitivity to underlying movement
+   - Gamma: Rate of change of delta
+   - Theta: Time decay (daily P&L from time passage)
+   - Vega: Sensitivity to volatility changes
+   - Rho: Sensitivity to interest rate changes
+
+2. **Jump Risk** - Stress test scenarios:
+   - Up10: Option value if underlying jumps up 10%
+   - Down10: Option value if underlying drops 10%
+   - JumpUp10/JumpDown10: Profit/loss from these sudden moves
+
+Jump risk helps identify vulnerabilities to sudden market shocks.
+
+Greeks are updated periodically (default: every 5 seconds) using the latest market data.
+"""
 
 from deephaven import time_table
 from deephaven.table import Table

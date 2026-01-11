@@ -1,5 +1,33 @@
+""" Main orchestration script for the option risk system.
 
-""" This script simulates a trading environment and computes the risk for a portfolio of options and stocks. """
+This script ties together all components to create a complete real-time risk management system:
+
+Workflow:
+1. Define underlying symbols and opening prices
+2. Generate security master (stocks + options with strikes/expiries)
+3. Simulate beta coefficients for market correlation
+4. Stream real-time market data (bid/ask prices, volatility)
+5. Simulate random trades to build portfolio positions
+6. Calculate Greeks (Delta, Gamma, Theta, Vega, Rho) periodically
+7. Aggregate position-level risk metrics
+8. Create hierarchical risk rollup for drill-down analysis
+9. Analyze execution slippage (post-trade price movement)
+
+Output Tables:
+- sec_master: Master list of tradeable securities
+- betas: Beta coefficients for market correlation
+- prices_history: Real-time streaming market prices
+- prices_current: Latest prices snapshot
+- trade_history: All executed trades
+- portfolio_history: Position changes over time
+- portfolio_current: Current positions
+- greeks_current: Current Greeks for all securities
+- risk_all: Detailed risk breakdown per position
+- risk_rollup: Hierarchical risk aggregation
+- slippage: Post-trade price movement analysis
+
+This demonstrates a complete end-to-end option risk management workflow in Deephaven.
+"""
 
 from deephaven import updateby as uby
 
