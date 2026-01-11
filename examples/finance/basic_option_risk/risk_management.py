@@ -1,3 +1,56 @@
+############################################################################################################
+# Basic Option Risk Management Example
+#
+# This example demonstrates option risk management fundamentals in a single, self-contained script.
+# All components (Black-Scholes pricing, market simulation, Greeks calculation, risk aggregation)
+# are included inline for easy learning and experimentation.
+#
+# Key Features:
+# - Self-contained: No external dependencies or setup files
+# - Educational: See the complete workflow in one place
+# - Risk aggregation: Multiple views of portfolio risk (by symbol, expiry, net)
+# - Trade analysis: Post-trade P&L analysis with forward-looking price movement
+#
+# Outputs:
+# - securities: Master list of tradeable stocks and options
+# - price_history / price_current: Simulated market data
+# - greek_history / greek_current: Option Greeks (Delta, Gamma, Theta, Vega, Rho)
+# - trade_history: Simulated trades
+# - portfolio_history / portfolio_current: Position tracking
+# - risk_all: Detailed risk per position
+# - risk_ue: Risk aggregated by symbol and expiration
+# - risk_u: Risk aggregated by symbol
+# - risk_e: Risk aggregated by expiration
+# - risk_net: Total portfolio risk
+# - trade_pnl: Post-trade price movement analysis
+# - trade_pnl_by_sym: P&L aggregated by symbol
+#
+# Comparison to other option risk examples:
+# - simple_risk_management: Interactive UI, multi-account tracking, real-time alerts
+# - option_risk: Modular structure with step-by-step components and slippage analysis
+#
+# This basic version is simpler and self-contained, while simple_risk_management includes:
+# - Modular structure with separate setup file
+# - Account-based portfolio tracking
+# - Interactive UI with reactive filters
+# - Risk alert system with table listeners
+# - Hierarchical rollup tables for drill-down
+#
+# Use this basic_option_risk example for:
+# - Learning option risk fundamentals
+# - Quick prototyping and experimentation
+# - Understanding the complete workflow in one place
+#
+# Use simple_risk_management for:
+# - Production-like risk monitoring with interactive UI
+# - Multi-account portfolio management
+# - Real-time risk alerts
+#
+# Use option_risk for:
+# - Step-by-step learning of each component
+# - Understanding modular code organization
+# - Advanced features like slippage analysis
+############################################################################################################
 
 # from deephaven_server import Server
 # _s = Server(port=10000, jvm_args=["-Xmx16g"])
@@ -11,9 +64,10 @@ from datetime import date, datetime, timedelta
 from deephaven import time_table, empty_table, merge, updateby as uby, dtypes as dht
 
 ############################################################################################################
-# Black-Scholes
+# Black-Scholes Option Pricing Model
 #
-# Write a Black-Scholes option pricing model in Python using Numba for vectorization.
+# Industry-standard model for calculating option prices and Greeks (sensitivity measures).
+# Uses Numba's @vectorize decorator for JIT compilation and high-performance vectorized operations.
 ############################################################################################################
 
 @numba.vectorize(['float64(float64)'])
