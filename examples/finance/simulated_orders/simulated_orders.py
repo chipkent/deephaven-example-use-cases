@@ -1,11 +1,35 @@
-""" This example simulates orders from an order management system. 
+""" This example simulates a realistic order management system (OMS) lifecycle.
 
-Possible order states are:
-* PendingSubmit - waiting for submission
-* Submitted - submitted but not filled
-* PartialFilled - submitted and partially filled
-* Filled - fully filled
-* Canceled - canceled before being fully filled
+Purpose:
+Demonstrates order state transitions in a trading system, useful for:
+- Understanding order lifecycle management
+- Building order monitoring dashboards
+- Testing downstream systems that consume order data
+- Learning Deephaven's table publishing and state management patterns
+
+Order State Flow:
+PendingSubmit → Submitted → PartialFilled → Filled
+                    ↓
+                PendingCancel → Canceled
+
+Order States:
+- PendingSubmit: Order created, waiting for submission to market
+- Submitted: Order sent to market, awaiting execution
+- PartialFilled: Order partially executed, remaining quantity still active
+- Filled: Order completely executed
+- Canceled: Order canceled before full execution
+
+Output Tables:
+- orders_blink: Blink table with only the most recent state change
+- orders_full: Complete history of all order state changes
+- orders_last: Latest state for each order (one row per OrderId)
+- orders_open: Currently active orders (excludes Filled and Canceled)
+
+Key Concepts Demonstrated:
+- Table publisher pattern for real-time data streams
+- Blink tables for latest-value semantics
+- State machine management
+- Thread-safe concurrent updates using execution context
 """
 
 from typing import Sequence
@@ -21,7 +45,13 @@ from deephaven.execution_context import get_exec_ctx
 
 
 class SimulateOrders:
-    """ Simulated order management system. """
+    """
+    Simulated order management system that generates realistic order state transitions.
+    
+    This class creates a continuous stream of order updates, simulating how orders
+    progress through various states in a real trading system. The simulation runs
+    asynchronously in a background thread.
+    """
 
     @dataclass
     class Order:
