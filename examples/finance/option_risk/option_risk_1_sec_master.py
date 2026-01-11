@@ -1,5 +1,17 @@
+""" Simulate a security master table with underlying and option securities.
 
-""" Simulate a security master table with underlying and option securities """
+A security master is a reference table containing all tradeable securities in the system.
+This module creates a master table with:
+- Underlying stocks
+- Options with multiple strikes (prices) and expiration dates
+
+For each underlying symbol, options are generated with:
+- Strikes: 10 different strike prices around the current stock price
+- Expiries: Two expiration dates (30 and 60 days out)
+- Parity: Both CALL and PUT options
+
+This generates a realistic universe of tradeable securities for the risk system.
+"""
 
 from datetime import date, datetime, timedelta
 import numpy as np
@@ -27,7 +39,7 @@ def simulate_expiries() -> jpy.JType:
 
 
 def simulate_security_master(underlyings: dict[str, float]) -> Table:
-    """ Simulate  a security master table with underlying and option securities """
+    """ Simulate a security master table with underlying and option securities """
 
     usyms_array = dht.array(dht.string, list(underlyings.keys()))
 

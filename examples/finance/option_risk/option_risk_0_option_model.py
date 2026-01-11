@@ -1,5 +1,24 @@
+""" Black-Scholes option pricing model in Python using Numba for vectorization.
 
-""" Black-Scholes option pricing model in Python using Numba for vectorization """
+This module implements the Black-Scholes option pricing model, which is the industry-standard
+method for calculating theoretical option prices and Greeks (sensitivity measures).
+
+Greeks Explained:
+- Delta: Sensitivity to underlying price changes ($ change in option per $1 change in stock)
+- Gamma: Rate of change of delta (measures delta stability)
+- Theta: Time decay (daily profit/loss from passage of time)
+- Vega: Sensitivity to volatility changes ($ change per 1% volatility change)
+- Rho: Sensitivity to interest rate changes
+
+Numba Optimization:
+All functions use Numba's @vectorize decorator for JIT compilation, enabling high-performance
+vectorized operations over arrays of option prices.
+
+Note: For stocks (is_stock=True), Greeks are simplified:
+- Price returns the stock price
+- Delta = 1.0 (stock moves 1:1 with itself)
+- All other Greeks = 0.0 (stocks don't have time decay, volatility sensitivity, etc.)
+"""
 
 import math
 import numba

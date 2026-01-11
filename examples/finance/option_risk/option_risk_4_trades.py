@@ -1,5 +1,28 @@
+""" Simulate random trading activity to build portfolio positions.
 
-""" Simulate trades for a given set of underlyings """
+This module generates a continuous stream of simulated trades that:
+- Create realistic portfolio positions across stocks and options
+- Mix stock trades (30%) with option trades (70%)
+- Use random trade sizes from -1000 to +1000 (positive = buy, negative = sell)
+- Execute at realistic bid/ask prices from the market data stream
+
+The simulation:
+1. Randomly selects securities (stocks or options)
+2. For options, randomly picks strikes and expiries
+3. Generates random buy/sell quantities
+4. Joins with market data to get execution prices (bid or ask)
+5. Filters out trades that couldn't be priced
+
+Output table columns:
+- Type: STOCK or OPTION
+- USym: Underlying symbol
+- Strike/Expiry/Parity: Option details (null for stocks)
+- TradeSize: Number of shares/contracts (negative = sell)
+- Bid/Ask: Market prices at trade time
+- TradePrice: Actual execution price
+
+This builds a realistic trading history for portfolio risk analysis.
+"""
 
 import numpy as np
 import numpy.typing as npt
@@ -8,7 +31,10 @@ from deephaven import time_table
 from deephaven.table import Table
 
 def simulate_trades(underlyings: dict[str, float], price_history: Table, update_interval: str) -> Table:
-    """ Simulate trades for a given set of underlyings """
+    """ Simulate random trades.
+    
+    Returns a ticking table with simulated trade executions including price and size.
+    """
 
     usyms_array = dht.array(dht.string, list(underlyings.keys()))
     strikes = {sym: simulate_strikes(underlyings, sym) for sym in underlyings.keys()}

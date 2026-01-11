@@ -1,3 +1,35 @@
+# Description: Comprehensive option risk management system demonstrating portfolio risk calculation.
+#
+# Overview:
+# This script simulates a trading environment and calculates risk metrics for a portfolio of stocks
+# and options using the Black-Scholes model. It demonstrates:
+# - Option pricing and Greeks calculation (Delta, Gamma, Theta, Vega, Rho)
+# - Portfolio position tracking
+# - Risk aggregation and rollup across multiple dimensions
+# - Execution slippage analysis
+#
+# Components:
+# 1. Option Model: Black-Scholes pricing functions with Numba JIT compilation
+# 2. Security Master: Table of stocks and options with strikes and expiries
+# 3. Market Data: Simulated real-time bid/ask prices and volatility
+# 4. Trading: Simulated trades across multiple securities
+# 5. Greeks: Real-time option sensitivity calculations
+# 6. Risk Metrics: Portfolio exposure and jump risk analysis
+# 7. Risk Rollup: Hierarchical aggregation by symbol/expiration/strike
+# 8. Slippage: Post-trade price movement analysis
+#
+# Output Tables:
+# - sec_master: Master table of securities
+# - betas: Beta coefficients for market correlation
+# - prices_history: Real-time simulated prices
+# - prices_current: Latest prices
+# - trade_history: All trades
+# - portfolio_history: Position changes over time
+# - portfolio_current: Current positions
+# - greeks_current: Current Greeks for all securities
+# - risk_all: Detailed risk breakdown per position
+# - risk_rollup: Hierarchical risk aggregation
+# - slippage: Post-trade price movement analysis
 
 ############################################################################################################
 # Option Model

@@ -1,4 +1,27 @@
-""" Setup the risk management example. """
+""" Setup utilities for the risk management example.
+
+This module provides:
+
+1. **Black-Scholes Option Pricing Model**
+   - Numba-optimized vectorized functions for high-performance calculations
+   - Functions: price, delta, gamma, theta, vega, rho
+   - Supports both stocks and options (call/put)
+
+2. **Market Data Simulation**
+   - Generates realistic streaming prices for stocks and options
+   - Simulates volatility changes over time
+   - Creates random trading activity across multiple accounts
+   - Produces beta coefficients for market correlation
+
+Exports:
+- norm_cdf, norm_pdf: Statistical distribution functions
+- black_scholes_price: Option/stock pricing
+- black_scholes_delta/gamma/theta/vega/rho: Option Greeks
+- simulate_market_data: Creates securities, price_history, trade_history, betas tables
+
+This module is automatically downloaded by risk_management.py and can be run standalone
+for testing or reused in other examples.
+"""
 
 import math
 import numpy as np
@@ -13,9 +36,10 @@ usyms_default = ["AAPL", "GOOG", "MSFT", "AMZN", "FB", "TSLA", "NVDA", "INTC", "
          "IEF", "LQD", "HYG", "JNK"]
 
 ############################################################################################################
-# Black-Scholes
+# Black-Scholes Option Pricing Model
 #
-# Write a Black-Scholes option pricing model in Python using Numba for vectorization.
+# Industry-standard model for calculating option prices and Greeks (sensitivity measures).
+# Uses Numba's @vectorize decorator for JIT compilation and high-performance vectorized operations.
 ############################################################################################################
 
 @numba.vectorize(['float64(float64)'])

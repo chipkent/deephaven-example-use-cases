@@ -1,10 +1,38 @@
 ############################################################################################################
-# This example demonstrates how to compute the principal component market factors of a set of stock returns
-# using PCA.  The example uses the deephaven.numpy module to perform the PCA computation using SciKitLearn
-# and the deephaven.table module to create a new table containing the computed factors.
+# Market Factor Analysis using Principal Component Analysis (PCA)
 #
-# NOTE: This example was created using Deephaven Core 0.32.  Support for multidimensional arrays will be
-# added in a coming release.  The example will be updated to use the new features when they are available.
+# This example demonstrates how to extract the dominant market factors driving stock returns using PCA.
+# Market factors represent common patterns of co-movement across stocks (e.g., sector trends, market-wide
+# movements, risk factors).
+#
+# What is PCA?
+# Principal Component Analysis is a dimensionality reduction technique that identifies the directions
+# (components) of maximum variance in the data. In finance, these components often represent systematic
+# risk factors that affect groups of stocks simultaneously.
+#
+# Use Cases:
+# - Portfolio risk management: Understand which market factors drive portfolio exposure
+# - Factor-based trading: Identify and trade on dominant market themes
+# - Risk decomposition: Separate systematic (market) risk from idiosyncratic (stock-specific) risk
+# - Anomaly detection: Identify stocks deviating from common market patterns
+#
+# Implementation:
+# This example uses scikit-learn's PCA implementation integrated with Deephaven tables via the
+# deephaven.numpy module. It computes factors from historical stock returns and reports the explained
+# variance for each component.
+#
+# Structure:
+# 1. compute_factors(): Reusable function for computing PCA factors from price data
+# 2. Example usage: Demonstrates the function on Deephaven Enterprise with FeedOS historical data
+#
+# Prerequisites:
+# - Deephaven Enterprise with FeedOS historical trade data
+# - scikit-learn (sklearn) and numpy packages
+#
+# Output:
+# - factors table: Principal components (factor loadings) for each symbol
+# - explained variance: How much variance each factor explains
+# - cumulative variance: Running total of explained variance
 ############################################################################################################
 
 from typing import Sequence, Tuple
@@ -100,7 +128,7 @@ def compute_factors(
 
 
 
-## Example usage on Deephaven Enterprise
+############################################################################################################\n# Example Usage on Deephaven Enterprise\n#\n# This section demonstrates using the compute_factors() function with FeedOS historical trade data.\n# It analyzes 500+ stocks over a date range to extract the top market factors.\n#\n# Requirements:\n# - Deephaven Enterprise with FeedOS access\n# - Historical trade data for the specified date range\n#\n# The symbol list below contains common US equities. You can modify this list to analyze different\n# securities or markets.\n############################################################################################################
 
 date_min = "2023-07-01"
 # date_min = "2024-01-28"
