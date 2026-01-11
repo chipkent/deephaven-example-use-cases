@@ -1,6 +1,24 @@
-# Description: This script simulates a simple stock market maker.
-# It uses an exponential moving average (EMA) to predict the price of a stock and make trades based on the prediction.
-# It requires Deephaven Enterprise to run but can be addapted to Deephaven Community.
+# Description: This script simulates a simple stock market maker using a mean-reversion strategy.
+#
+# Trading Strategy:
+# - Uses exponential moving average (EMA) and standard deviation to predict price movements
+# - Buys when the ask price drops below (predicted price - 1 standard deviation)
+# - Sells when the bid price rises above (predicted price + 1 standard deviation)
+# - Manages risk through per-symbol position limits in dollars
+#
+# Requirements:
+# - Deephaven Enterprise with FeedOS access for live market data
+# - Can be adapted to Deephaven Community by replacing FeedOS with alternative data source
+#
+# Output Tables:
+# - controls: User-editable table for symbol selection and risk limits
+# - ticks_bid_ask: Live bid/ask quotes for monitored symbols
+# - preds: Price predictions with EMA-based buy/sell thresholds
+# - trades: Historical record of all simulated trades
+# - positions: Current position (shares held) per symbol
+# - pnl: Unrealized profit and loss per symbol
+# - orders: Current trading signals and position status
+# - executions: Snapshot of recent trade decisions
 
 from deephaven import time_table, new_table, input_table, DynamicTableWriter
 from deephaven.column import string_col, double_col
@@ -9,7 +27,7 @@ from deephaven.updateby import ema_time, emstd_time, cum_min
 from deephaven.plot import Figure, PlotStyle
 from deephaven.plot.selectable_dataset import one_click
 
-ema_decay_time = "PT00:01:00"
+ema_decay_time = "PT00:01:00"  # EMA decay time window: 1 minute
 
 ############################################################################################################
 # Create user-modifiable strategy controls table.
@@ -115,7 +133,26 @@ orders = preds.last_by(["Sym"]) \
 ############################################################################################################
 
 def simulate_1_lot(date, timestamp, sym, bid, ask, pred_buy, pred_sell, is_buy_active, is_sell_active) -> str:
-    """ Simulate a trade of 1 lot based on the current state of the market and predictions. """
+    """
+    Simulate a trade of 1 lot (100 shares) based on market conditions and predictions.
+    
+    Buy Logic: When position limits allow and ask < pred_buy (market price below lower threshold)
+    Sell Logic: When position limits allow and bid > pred_sell (market price above upper threshold)
+    
+    Args:
+        date: Trading date
+        timestamp: Current timestamp
+        sym: Stock symbol
+        bid: Current bid price
+        ask: Current ask price
+        pred_buy: Buy threshold (predicted price - 1 SD)
+        pred_sell: Sell threshold (predicted price + 1 SD)
+        is_buy_active: Whether buy orders are allowed (position limit check)
+        is_sell_active: Whether sell orders are allowed (position limit check)
+    
+    Returns:
+        Trade action: "BUY", "SELL", or "NO TRADE"
+    """
 
     if is_buy_active and ask < pred_buy:
         trades_writer.write_row(date, timestamp, sym, ask, 100)
