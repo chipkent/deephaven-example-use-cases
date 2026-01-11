@@ -1,4 +1,32 @@
-# Description: This script demonstrates a simple risk management system for a portfolio of options.
+# Description: This script demonstrates a real-time risk management system for a portfolio of stocks and options.
+#
+# Overview:
+# - Calculates option Greeks (Delta, Gamma, Theta, Vega, Rho) using Black-Scholes model
+# - Aggregates risk metrics across portfolio positions
+# - Monitors jump risk (potential P&L from sudden 10% market moves)
+# - Provides risk alerts when thresholds are exceeded
+# - Includes reactive UI for interactive risk analysis
+#
+# Features:
+# - Real-time Greeks calculation with 5-second updates
+# - Beta-adjusted dollar delta for market-correlated risk
+# - Hierarchical risk rollup (by symbol, expiration, strike)
+# - Table listener for risk threshold alerts
+# - Interactive dashboard with account/symbol/expiration filters
+#
+# Output Tables:
+# - securities: Master list of stocks and options
+# - price_history: Simulated real-time prices and volatility
+# - trade_history: All simulated trades
+# - portfolio_history: Position changes over time
+# - portfolio_current: Current positions
+# - greek_current: Current Greeks and theoretical values
+# - betas: Beta coefficients for market correlation
+# - risk_all: Detailed risk per position
+# - risk_roll: Hierarchical risk aggregation
+# - jump: Jump risk by symbol
+# - jump_alerts: Symbols exceeding risk limits
+# - reactive_risk: Interactive risk UI component
 
 ############################################################################################################
 # Install the setup package from GitHub
