@@ -1,0 +1,45 @@
+name: "trading_simulation"
+
+deephaven:
+  connection_url: "${DH_CONNECTION_URL}"
+  auth_method: "password"
+  username: "${DH_USERNAME}"
+  password: "${DH_PASSWORD}"
+  private_key_path: ""
+  
+execution:
+  worker_script: "trading_simulation.py"
+  num_workers: 10
+  max_concurrent_sessions: 50
+  max_retries: 3
+  
+replay:
+  heap_size_gb: 8.0
+  init_timeout_minutes: 30
+  script_language: "Python"
+  jvm_profile: "Default"
+  replay_time: "09:30:00"
+  replay_speed: 10.0
+  sorted_replay: true
+  buffer_rows: 10000
+  # replay_timestamp_columns:  # Optional: specify timestamp column per table
+  #   - namespace: "Market"
+  #     table: "Trade"
+  #     column: "EventTime"
+
+scheduler:
+  calendar: "USNYSE"
+  start_time: "09:30:00"
+  stop_time: "16:00:00"
+  timezone: "America/New_York"
+  business_days: true
+  
+dates:
+  start: "2024-01-01"
+  end: "2024-12-31"
+  weekdays_only: true
+  
+env:
+  MAX_POSITION_DOLLARS: "10000"
+  EMA_DECAY_TIME: "PT00:01:00"
+  LOT_SIZE: "100"
