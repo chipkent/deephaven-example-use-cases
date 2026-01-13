@@ -33,6 +33,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)  # Default to INFO, can be changed to DEBUG with --verbose
 
 
 # Exit codes
@@ -155,6 +156,12 @@ class ReplayOrchestrator:
                         f"Allowed fields: {', '.join(sorted(allowed_fields[section]))}"
                     )
         
+        # Log scheduler configuration status
+        if 'scheduler' in config:
+            logger.debug("Scheduler configuration found - PQ will use scheduled start/stop times")
+        else:
+            logger.debug("No scheduler configuration - PQ will run immediately without time constraints")
+        
         # Validate numeric fields with bounds
         if 'replay_speed' in config['replay']:
             speed = config['replay']['replay_speed']
@@ -235,11 +242,14 @@ class ReplayOrchestrator:
     
     def _expand_env_vars(self, config: Dict[str, Any]):
         """Expand environment variables in config values."""
+        env_vars_found = set()
+        
         def expand_value(value):
             if isinstance(value, str) and value.startswith('${') and value.endswith('}'):
                 env_var = value[2:-1]
                 if env_var not in os.environ:
                     raise ValueError(f"Environment variable not set: {env_var}")
+                env_vars_found.add(env_var)
                 return os.environ[env_var]
             return value
         
@@ -247,6 +257,9 @@ class ReplayOrchestrator:
             if isinstance(config[section], dict):
                 for key in config[section]:
                     config[section][key] = expand_value(config[section][key])
+        
+        if env_vars_found:
+            logger.debug(f"Expanded environment variables: {', '.join(sorted(env_vars_found))}")
     
     def _generate_dates(self) -> List[str]:
         """Generate list of dates based on configuration."""
@@ -266,6 +279,8 @@ class ReplayOrchestrator:
             
             current_date += timedelta(days=1)
         
+        weekdays_msg = " (weekdays only)" if weekdays_only else ""
+        logger.info(f"Generated {len(dates)} dates: {self.config['dates']['start']} to {self.config['dates']['end']}{weekdays_msg}")
         return dates
     
     def _authenticate(self):
@@ -373,7 +388,9 @@ class ReplayOrchestrator:
             
             with open(worker_script, 'r') as f:
                 self.worker_script_content = f.read()
-            logger.info(f"Loaded worker script: {worker_script}")
+            logger.info(f"Loaded worker script: {worker_script} ({len(self.worker_script_content)} bytes)")
+        else:
+            logger.debug(f"Using cached worker script content ({len(self.worker_script_content)} bytes)")
         
         config_msg.scriptCode = self.worker_script_content
         
@@ -456,7 +473,7 @@ class ReplayOrchestrator:
             return False, None
     
     def _generate_session_tasks(self) -> List[Tuple[str, int]]:
-        """Generate all (date, worker_id) combinations."""
+        """Generate list of (date, worker_id) tuples for all sessions."""
         dates = self._generate_dates()
         num_workers = self.config['execution']['num_workers']
         
@@ -465,6 +482,7 @@ class ReplayOrchestrator:
             for worker_id in range(num_workers):
                 tasks.append((date, worker_id))
         
+        logger.info(f"Generated {len(tasks)} tasks ({len(dates)} dates × {num_workers} workers)")
         return tasks
     
     def _get_running_session_count(self, pq_info_map: Dict[int, Any], active_sessions: Set[Tuple[str, int]]) -> int:
@@ -489,6 +507,7 @@ class ReplayOrchestrator:
                 if self.session_mgr.controller_client.is_running(pq_info.state.status):
                     running_count += 1
         
+        logger.debug(f"Running sessions: {running_count}, Active: {len(active_sessions)}")
         return running_count
     
     def _check_session_status(self, session_key: Tuple[str, int], pq_info_map: Dict[int, Any]) -> Optional[str]:
@@ -560,7 +579,14 @@ class ReplayOrchestrator:
         created_count = 0
         map_needs_refresh = False
         
-        while self._get_running_session_count(pq_info_map, active_sessions) < max_concurrent and pending_tasks:
+        while True:
+            running_count = self._get_running_session_count(pq_info_map, active_sessions)
+            if running_count >= max_concurrent:
+                logger.debug(f"At capacity: {running_count}/{max_concurrent} sessions running")
+                break
+            if not pending_tasks:
+                logger.debug("No pending tasks remaining")
+                break
             if self.shutdown_requested:
                 logger.info("Shutdown requested, stopping session creation")
                 break
@@ -650,6 +676,7 @@ class ReplayOrchestrator:
         
         try:
             pq_info_map, new_version = self.session_mgr.controller_client.map_and_version()
+            logger.debug(f"Waiting for status change from version {new_version} (timeout: {timeout_seconds}s)")
             self.session_mgr.controller_client.wait_for_change_from_version(
                 map_version=new_version,
                 timeout_seconds=timeout_seconds
@@ -729,7 +756,9 @@ class ReplayOrchestrator:
             
             # Refresh map if we created sessions
             if map_needs_refresh:
+                old_version = map_version
                 pq_info_map, map_version = self.session_mgr.controller_client.map_and_version()
+                logger.debug(f"Refreshed PQ info map (version: {old_version} → {map_version})")
             
             # Check for completed/failed sessions
             completed_delta, failed_delta = self._process_active_sessions(active_sessions, pq_info_map)
@@ -791,8 +820,18 @@ def main():
         action='store_true',
         help='Validate configuration without creating sessions'
     )
+    parser.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Enable verbose (DEBUG) logging for detailed troubleshooting'
+    )
     
     args = parser.parse_args()
+    
+    # Configure logging level based on verbose flag
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
     
     try:
         orchestrator = ReplayOrchestrator(args.config, dry_run=args.dry_run)

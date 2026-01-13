@@ -125,13 +125,14 @@ This will create 6 replay sessions (3 dates × 2 workers per date). Monitor prog
 ## Command-Line Options
 
 ```bash
-replay-orchestrator --config <path> [--dry-run]
+replay-orchestrator --config <path> [--dry-run] [--verbose]
 ```
 
 **Options:**
 
 - `--config <path>` (required): Path to YAML configuration file
 - `--dry-run` (optional): Validate configuration without creating sessions. Useful for testing your setup before running large-scale orchestrations.
+- `--verbose` (optional): Enable verbose (DEBUG) logging for detailed troubleshooting. Shows additional information about session capacity, PQ map refreshes, and internal operations.
 
 **Exit Codes:**
 
