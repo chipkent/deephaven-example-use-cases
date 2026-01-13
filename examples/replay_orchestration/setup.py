@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
     name="deephaven-replay-orchestration",
@@ -9,7 +9,7 @@ setup(
         "deephaven-coreplus-client",
         "pyyaml>=6.0",
     ],
-    packages=find_packages(),
+    py_modules=['replay_orchestrator'],
     entry_points={
         "console_scripts": [
             "replay-orchestrator=replay_orchestrator:main",

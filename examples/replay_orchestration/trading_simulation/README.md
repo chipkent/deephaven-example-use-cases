@@ -82,7 +82,7 @@ Each worker creates:
 ## Running
 
 ```bash
-python replay_orchestrator.py --config trading_simulation/config.yaml
+replay-orchestrator --config trading_simulation/config.yaml
 ```
 
 **Note**: This requires Deephaven Enterprise with FeedOS access for historical equity quote data.

@@ -48,7 +48,7 @@ This creates 2 workers per date × 3 dates = 6 total sessions.
 From the `replay_orchestration` directory:
 
 ```bash
-python replay_orchestrator.py --config simple_worker/config.yaml
+replay-orchestrator --config simple_worker/config.yaml
 ```
 
 ## Output

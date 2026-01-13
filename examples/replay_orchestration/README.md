@@ -109,7 +109,7 @@ export DH_PASSWORD="your_password"
 **Test configuration first (recommended):**
 
 ```bash
-python replay_orchestrator.py --config simple_worker/config.yaml --dry-run
+replay-orchestrator --config simple_worker/config.yaml --dry-run
 ```
 
 This validates your configuration without creating any sessions.
@@ -117,7 +117,7 @@ This validates your configuration without creating any sessions.
 **Run the orchestrator:**
 
 ```bash
-python replay_orchestrator.py --config simple_worker/config.yaml
+replay-orchestrator --config simple_worker/config.yaml
 ```
 
 This will create 6 replay sessions (3 dates × 2 workers per date). Monitor progress in the console output. Press Ctrl+C to gracefully stop (finishes current operations before exiting).
@@ -125,7 +125,7 @@ This will create 6 replay sessions (3 dates × 2 workers per date). Monitor prog
 ## Command-Line Options
 
 ```bash
-python replay_orchestrator.py --config <path> [--dry-run]
+replay-orchestrator --config <path> [--dry-run]
 ```
 
 **Options:**
