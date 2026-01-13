@@ -243,3 +243,59 @@ class CombinedTable(Generic[Table]):
             )
         else:
             raise ValueError(f"Invalid type {type(table)} for argument table")
+
+    def combined_natural_join(self, table: Union[Table, 'CombinedTable'], on: Union[str, Sequence[str]],
+            joins: Union[str, Sequence[str]] = None) -> 'CombinedTable':
+        """Natural join of two combined tables.  All historical and live table combinations are joined. 
+        It there are multiple matches, one of the matches is returned (historical), and the other is ignored (live).  
+        As such, combined_natural_join does not contain the error checking for multiple matches present in a standard natural join.
+
+        NOTE: This function may return a different result than natural_join because of how multiple matches are handled.
+
+        NOTE: This function could perform up to 4 natural_joins.  If you know that all historical matches are found in the historical subtable
+        and all live matches are found in the live subtable, you can use `combined_join("natural_join", table, on, joins)` to improve performance.
+
+        Args:
+            table (Union[Table, CombinedTable]): the table to join with
+            on: The columns to join on.
+            joins: The columns to join on.
+
+        Returns:
+            A new CombinedTable object.
+        """
+
+        def subjoin(lhs: Table, rhs1: Table, rhs2: Table, on: Sequence[str], joins: Sequence[str]) -> Table:
+
+            joins_dict = {s[0] if (s := j.split("=")) and len(s) > 1 else j: s[1] if len(s) > 1 else j for j in joins}
+
+            return (
+                lhs
+                .natural_join(rhs1.update_view("__SJ1__MARKER=true"), on=on, joins=["__SJ1__MARKER"]+[f"__SJ1__{j}={j}" for j in joins_dict.values()])
+                .natural_join(rhs2.update_view("__SJ2__MARKER=true"), on=on, joins=["__SJ2__MARKER"]+[f"__SJ2__{j}={j}" for j in joins_dict.values()])
+                .update_view([f"{k} = __SJ1__MARKER ? __SJ1__{v} : __SJ2__{v}" for k,v in joins_dict.items()])
+                .drop_columns(["__SJ1__MARKER", "__SJ2__MARKER"] + [f"__SJ1__{j}" for j in joins_dict.values()] + [f"__SJ2__{j}" for j in joins_dict.values()])   
+            )
+
+        def to_sequence(v):
+            if isinstance(v, str):
+                return [v]
+            return v
+
+        if isinstance(table, type(self.historical)):
+            return CombinedTable(
+                self._merge,
+                self.historical.natural_join(table, on, joins),
+                self.live.natural_join(table, on, joins)
+            )
+
+        on = to_sequence(on)
+        joins = to_sequence(joins)
+
+        if not joins:
+            joins = table.column_names - on
+
+        return CombinedTable(
+            self._merge,
+            subjoin(self.historical, table.historical, table.live, on, joins),
+            subjoin(self.live, table.historical, table.live, on, joins)
+        )
