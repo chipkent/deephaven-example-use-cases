@@ -38,10 +38,10 @@ execution:
 dates:
   start: "2024-01-01"
   end: "2024-01-05"
-  weekdays_only: true         # Only Mon-Fri (3 days in this range)
+  weekdays_only: true         # Only Mon-Fri (5 weekdays in this range)
 ```
 
-This creates 2 workers per date × 3 dates = 6 total sessions.
+This creates 2 workers per date × 5 weekdays = 10 total sessions.
 
 ## Running
 
@@ -65,7 +65,7 @@ The script also creates an in-memory table (`worker_status`) to demonstrate basi
 
 After running, check the orchestrator console output to verify:
 
-- All 6 sessions (2 workers × 3 dates) were created
+- All 10 sessions (2 workers × 5 weekdays) were created
 - Each session completed successfully
 - No failures reported
 - Exit code 0 (success)
