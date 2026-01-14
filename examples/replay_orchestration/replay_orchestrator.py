@@ -70,6 +70,7 @@ class ReplayOrchestrator:
         self.retry_counts: Dict[Tuple[str, int], int] = {}
         self.worker_script_content: Optional[str] = None
         self.shutdown_requested = False
+        self._cleanup_done = False
         
         # Set up signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._handle_shutdown_signal)
@@ -328,10 +329,51 @@ class ReplayOrchestrator:
         if end_date < start_date:
             raise ValueError(f"dates.end ({config['dates']['end']}) must be >= dates.start ({config['dates']['start']})")
     
+    def _cleanup_sessions(self):
+        """Stop and delete all tracked sessions. Idempotent - safe to call multiple times."""
+        if self._cleanup_done:
+            return
+        
+        self._cleanup_done = True
+        
+        if not self.sessions:
+            return
+        
+        logger.info(f"Cleaning up {len(self.sessions)} sessions...")
+        stopped = 0
+        deleted = 0
+        errors = 0
+        
+        for session_key, serial in self.sessions.items():
+            date, worker_id = session_key
+            try:
+                # Try to stop the query first
+                try:
+                    self.session_mgr.controller_client.stop_query(serial)
+                    stopped += 1
+                    logger.debug(f"Stopped session: date={date}, worker={worker_id}, serial={serial}")
+                except Exception as e:
+                    logger.debug(f"Could not stop session (may already be stopped): date={date}, worker={worker_id}, error={e}")
+                
+                # Try to delete the query
+                try:
+                    self.session_mgr.controller_client.delete_query(serial)
+                    deleted += 1
+                    logger.debug(f"Deleted session: date={date}, worker={worker_id}, serial={serial}")
+                except Exception as e:
+                    logger.debug(f"Could not delete session (may already be deleted): date={date}, worker={worker_id}, error={e}")
+                    errors += 1
+            except Exception as e:
+                logger.error(f"Error cleaning up session: date={date}, worker={worker_id}, error={e}")
+                errors += 1
+        
+        logger.info(f"Cleanup complete: {stopped} stopped, {deleted} deleted, {errors} errors")
+    
     def _handle_shutdown_signal(self, signum, frame):
         """Handle shutdown signals gracefully."""
-        logger.warning("\nShutdown signal received. Finishing current operations...")
+        logger.warning("\nShutdown signal received. Cleaning up sessions...")
         self.shutdown_requested = True
+        self._cleanup_sessions()
     
     def _expand_env_vars(self, config: Dict[str, Any]):
         """Expand environment variables in config values."""
@@ -911,6 +953,7 @@ class ReplayOrchestrator:
         # Handle shutdown
         if self.shutdown_requested:
             logger.warning(f"Orchestrator stopped by user. Active sessions: {len(active_sessions)}, Pending: {len(pending_tasks)}")
+            self._cleanup_sessions()
         
         # Print summary
         self._print_summary(total_tasks, created, completed, failed)
