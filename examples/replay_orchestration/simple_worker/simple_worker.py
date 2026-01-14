@@ -1,5 +1,4 @@
 import os
-import sys
 from deephaven import new_table
 from deephaven.column import string_col, int_col
 from deephaven.time import dh_today
@@ -28,4 +27,14 @@ worker_status = new_table([
 ])
 
 print(f"[{log_level}] Simple Worker Completed Successfully")
-sys.exit(0)
+
+############################################################################################################
+# Shutdown
+############################################################################################################
+
+from deephaven_enterprise.client.session_manager import SessionManager
+import time
+
+time.sleep(30)
+sm=SessionManager()
+sm.controller_client.stop_and_wait(__PERSISTENT_QUERY_SERIAL_NUMBER)

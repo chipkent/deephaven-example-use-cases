@@ -94,7 +94,7 @@ class ReplayOrchestrator:
     def _validate_config(self, config: Dict):
         """Validate required configuration fields and reject unexpected ones."""
         # Define all expected sections
-        expected_sections = {'name', 'deephaven', 'execution', 'replay', 'scheduler', 'dates', 'env'}
+        expected_sections = {'name', 'deephaven', 'execution', 'replay', 'dates', 'env'}
         
         # Check for unexpected sections
         actual_sections = set(config.keys())
@@ -128,14 +128,13 @@ class ReplayOrchestrator:
         
         allowed_fields = {
             'deephaven': {'connection_url', 'auth_method', 'username', 'password', 'private_key_path'},
-            'execution': {'worker_script', 'num_workers', 'max_concurrent_sessions', 'max_retries'},
+            'execution': {'worker_script', 'num_workers', 'max_concurrent_sessions', 'max_retries', 'delete_successful_queries', 'delete_failed_queries'},
             'replay': {
                 'heap_size_gb', 'init_timeout_minutes',
                 'replay_start', 'replay_speed', 'sorted_replay',
                 'buffer_rows', 'replay_timestamp_columns',
                 'script_language', 'jvm_profile', 'server_name'
             },
-            'scheduler': {'calendar', 'start_time', 'stop_time', 'timezone', 'business_days'},
             'dates': {'start', 'end', 'weekdays_only'},
             'env': None  # env section can have arbitrary user-defined variables
         }
@@ -157,12 +156,6 @@ class ReplayOrchestrator:
                         f"Allowed fields: {', '.join(sorted(allowed_fields[section]))}"
                     )
         
-        # Log scheduler configuration status
-        if 'scheduler' in config:
-            logger.debug("Scheduler configuration found - PQ will use scheduled start/stop times")
-        else:
-            logger.debug("No scheduler configuration - PQ will run immediately without time constraints")
-        
         # Validate required string fields are non-empty
         connection_url = config['deephaven']['connection_url']
         if not isinstance(connection_url, str) or not connection_url.strip():
@@ -178,6 +171,8 @@ class ReplayOrchestrator:
         
         # Validate auth_method (required field)
         auth_method = config['deephaven']['auth_method']
+        if not isinstance(auth_method, str):
+            raise ValueError(f"auth_method must be a string (got {type(auth_method).__name__})")
         if auth_method not in ['password', 'private_key']:
             raise ValueError(f"auth_method must be 'password' or 'private_key' (got '{auth_method}')")
         
@@ -185,9 +180,15 @@ class ReplayOrchestrator:
         if auth_method == 'password':
             if 'password' not in config['deephaven'] or not config['deephaven']['password']:
                 raise ValueError("password is required when auth_method is 'password'")
+            password = config['deephaven']['password']
+            if not isinstance(password, str):
+                raise ValueError(f"password must be a string (got {type(password).__name__})")
         elif auth_method == 'private_key':
             if 'private_key_path' not in config['deephaven'] or not config['deephaven']['private_key_path']:
                 raise ValueError("private_key_path is required when auth_method is 'private_key'")
+            private_key_path = config['deephaven']['private_key_path']
+            if not isinstance(private_key_path, str) or not private_key_path.strip():
+                raise ValueError("private_key_path must be a non-empty string")
         
         # Validate numeric fields with type and bounds (required fields)
         heap = config['replay']['heap_size_gb']
@@ -231,6 +232,16 @@ class ReplayOrchestrator:
             if retries < 0:
                 raise ValueError(f"max_retries must be >= 0 (got {retries})")
         
+        if 'delete_successful_queries' in config['execution']:
+            delete_successful = config['execution']['delete_successful_queries']
+            if not isinstance(delete_successful, bool):
+                raise ValueError(f"delete_successful_queries must be a boolean (got {type(delete_successful).__name__})")
+        
+        if 'delete_failed_queries' in config['execution']:
+            delete_failed = config['execution']['delete_failed_queries']
+            if not isinstance(delete_failed, bool):
+                raise ValueError(f"delete_failed_queries must be a boolean (got {type(delete_failed).__name__})")
+        
         if 'init_timeout_minutes' in config['replay']:
             timeout = config['replay']['init_timeout_minutes']
             if not isinstance(timeout, (int, float)):
@@ -248,6 +259,8 @@ class ReplayOrchestrator:
         # Validate replay_start format (HH:MM:SS)
         import re
         replay_start = config['replay']['replay_start']
+        if not isinstance(replay_start, str):
+            raise ValueError(f"replay_start must be a string (got {type(replay_start).__name__})")
         if not re.match(r'^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$', replay_start):
             raise ValueError(f"replay_start must be in HH:MM:SS format (got '{replay_start}')")
         
@@ -259,8 +272,16 @@ class ReplayOrchestrator:
         
         # Validate script_language (required field)
         lang = config['replay']['script_language']
+        if not isinstance(lang, str):
+            raise ValueError(f"script_language must be a string (got {type(lang).__name__})")
         if lang not in ['Python', 'Groovy']:
             raise ValueError(f"script_language must be 'Python' or 'Groovy' (got '{lang}')")
+        
+        # Validate optional jvm_profile
+        if 'jvm_profile' in config['replay']:
+            jvm_profile = config['replay']['jvm_profile']
+            if not isinstance(jvm_profile, str) or not jvm_profile.strip():
+                raise ValueError("jvm_profile must be a non-empty string")
         
         # Validate optional server_name
         if 'server_name' in config['replay']:
@@ -285,6 +306,11 @@ class ReplayOrchestrator:
                 unexpected_keys = actual_keys - required_keys
                 if unexpected_keys:
                     raise ValueError(f"replay_timestamp_columns[{idx}] has unexpected keys: {', '.join(sorted(unexpected_keys))}")
+                # Validate that all values are non-empty strings
+                for key in required_keys:
+                    value = ts_config[key]
+                    if not isinstance(value, str) or not value.strip():
+                        raise ValueError(f"replay_timestamp_columns[{idx}].{key} must be a non-empty string (got {type(value).__name__})")
         
         # Validate optional boolean fields
         if 'weekdays_only' in config['dates']:
@@ -292,36 +318,20 @@ class ReplayOrchestrator:
             if not isinstance(weekdays, bool):
                 raise ValueError(f"weekdays_only must be a boolean (got {type(weekdays).__name__})")
         
-        # Validate scheduler section if present - all fields are required
-        if 'scheduler' in config:
-            required_scheduler_fields = {'calendar', 'start_time', 'stop_time', 'timezone', 'business_days'}
-            actual_scheduler_fields = set(config['scheduler'].keys())
-            missing_scheduler = required_scheduler_fields - actual_scheduler_fields
-            if missing_scheduler:
-                raise ValueError(f"scheduler section missing required fields: {', '.join(sorted(missing_scheduler))}")
-            unexpected_scheduler = actual_scheduler_fields - required_scheduler_fields
-            if unexpected_scheduler:
-                raise ValueError(f"scheduler section has unexpected fields: {', '.join(sorted(unexpected_scheduler))}")
-            
-            # Validate scheduler field types and formats
-            if not isinstance(config['scheduler']['business_days'], bool):
-                raise ValueError(f"scheduler.business_days must be a boolean (got {type(config['scheduler']['business_days']).__name__})")
-            
-            # Validate time formats (HH:MM:SS)
-            for time_field in ['start_time', 'stop_time']:
-                time_val = config['scheduler'][time_field]
-                if not isinstance(time_val, str):
-                    raise ValueError(f"scheduler.{time_field} must be a string (got {type(time_val).__name__})")
-                if not re.match(r'^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$', time_val):
-                    raise ValueError(f"scheduler.{time_field} must be in HH:MM:SS format (got '{time_val}')")
-        
         # Validate date format and range
+        start_str = config['dates']['start']
+        if not isinstance(start_str, str):
+            raise ValueError(f"dates.start must be a string (got {type(start_str).__name__})")
         try:
-            start_date = datetime.strptime(config['dates']['start'], '%Y-%m-%d')
+            start_date = datetime.strptime(start_str, '%Y-%m-%d')
         except ValueError as e:
             raise ValueError(f"dates.start must be in YYYY-MM-DD format: {e}")
+        
+        end_str = config['dates']['end']
+        if not isinstance(end_str, str):
+            raise ValueError(f"dates.end must be a string (got {type(end_str).__name__})")
         try:
-            end_date = datetime.strptime(config['dates']['end'], '%Y-%m-%d')
+            end_date = datetime.strptime(end_str, '%Y-%m-%d')
         except ValueError as e:
             raise ValueError(f"dates.end must be in YYYY-MM-DD format: {e}")
         
@@ -479,6 +489,7 @@ class ReplayOrchestrator:
     
     def _build_persistent_query_config(self, date: str, worker_id: int) -> PersistentQueryConfigMessage:
         """Build PersistentQueryConfigMessage for a specific date and worker."""
+        # Create basic config message
         config_msg = PersistentQueryConfigMessage()
         
         # Basic fields
@@ -597,16 +608,14 @@ class ReplayOrchestrator:
         
         config_msg.extraJvmArguments.extend(jvm_args)
         
-        # Scheduler parameters - only set if scheduler section exists
-        if 'scheduler' in self.config:
-            scheduling = GenerateScheduling.generate_daily_scheduler(
-                start_time=self.config['scheduler']['start_time'],
-                stop_time=self.config['scheduler']['stop_time'],
-                time_zone=self.config['scheduler']['timezone'],
-                business_days=self.config['scheduler']['business_days'],
-                calendar=self.config['scheduler']['calendar'],
-            )
-            config_msg.scheduling.extend(scheduling)
+        # Continuous scheduler - starts immediately and runs until worker stops it
+        # Temporary scheduler is incompatible with replay queries (cannot have stop time)
+        scheduling = GenerateScheduling.generate_continuous_scheduler(
+            start_time="00:00:00",
+            time_zone="UTC",
+            restart_daily=False
+        )
+        config_msg.scheduling.extend(scheduling)
         
         return config_msg
     
@@ -704,7 +713,7 @@ class ReplayOrchestrator:
         
         if self.session_mgr.controller_client.is_terminal(status):
             status_name = self.session_mgr.controller_client.status_name(status)
-            if status_name == 'PQS_COMPLETED':
+            if status_name in ('PQS_COMPLETED', 'PQS_STOPPED'):
                 return 'completed'
             else:
                 return 'failed'
@@ -859,6 +868,52 @@ class ReplayOrchestrator:
             except Exception:
                 return {}, map_version
     
+    def _delete_queries(self, delete_successful: bool, delete_failed: bool):
+        """Delete queries managed by this orchestrator based on options.
+        
+        Args:
+            delete_successful: If True, delete successfully completed queries
+            delete_failed: If True, delete failed queries
+        """
+        if self.dry_run:
+            return
+        
+        if not delete_successful and not delete_failed:
+            return
+        
+        deleted_successful = 0
+        deleted_failed = 0
+        failed_deletions = 0
+        
+        for session_key, serial in self.sessions.items():
+            is_failed = session_key in self.failed_sessions
+            
+            # Decide whether to delete based on session status and config
+            should_delete = (is_failed and delete_failed) or (not is_failed and delete_successful)
+            
+            if not should_delete:
+                continue
+            
+            try:
+                self.session_mgr.controller_client.delete_query(serial)
+                if is_failed:
+                    deleted_failed += 1
+                else:
+                    deleted_successful += 1
+                date, worker_id = session_key
+                logger.debug(f"Deleted {'failed' if is_failed else 'successful'} query: date={date}, worker={worker_id}, serial={serial}")
+            except Exception as e:
+                failed_deletions += 1
+                date, worker_id = session_key
+                logger.warning(f"Failed to delete query: date={date}, worker={worker_id}, serial={serial}: {e}")
+        
+        if deleted_successful > 0:
+            logger.info(f"Deleted {deleted_successful} successful queries")
+        if deleted_failed > 0:
+            logger.info(f"Deleted {deleted_failed} failed queries")
+        if failed_deletions > 0:
+            logger.warning(f"Failed to delete {failed_deletions} queries")
+    
     def _print_summary(self, total_tasks: int, created: int, completed: int, failed: int):
         """Print final execution summary."""
         logger.info("=" * 80)
@@ -955,6 +1010,12 @@ class ReplayOrchestrator:
         if self.shutdown_requested:
             logger.warning(f"Orchestrator stopped by user. Active sessions: {len(active_sessions)}, Pending: {len(pending_tasks)}")
             self._cleanup_sessions()
+        
+        # Delete queries based on configuration
+        delete_successful = self.config['execution'].get('delete_successful_queries', True)
+        delete_failed = self.config['execution'].get('delete_failed_queries', False)
+        if not self.dry_run:
+            self._delete_queries(delete_successful, delete_failed)
         
         # Print summary
         self._print_summary(total_tasks, created, completed, failed)

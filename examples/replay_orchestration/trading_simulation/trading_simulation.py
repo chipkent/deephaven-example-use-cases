@@ -147,6 +147,9 @@ print(f"[INFO] Trading Simulation Worker Initialized Successfully")
 # Monitor until market close and exit
 ############################################################################################################
 
+from deephaven_enterprise.client.session_manager import SessionManager
+import time
+
 print(f"[INFO] Monitoring until market close...")
 
 # Monitor dh_now() and exit at market close (16:00:00 in scheduler)
@@ -171,8 +174,10 @@ while True:
     if current_time >= end_time:
         print(f"[INFO] Market close reached at {current_time}, exiting...")
         print(f"[INFO] Trading Simulation Worker Completed Successfully")
-        sys.exit(0)
-    
+        sm=SessionManager()
+        sm.controller_client.stop_and_wait(__PERSISTENT_QUERY_SERIAL_NUMBER)
+        break
+
     # Sleep to avoid busy-waiting (real-time sleep, not simulation time)
     time.sleep(check_interval)
 

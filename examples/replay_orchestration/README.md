@@ -207,6 +207,8 @@ execution:
 - `num_workers` (required): Number of parallel workers per date (range: 1-1000). Each worker receives a unique `WORKER_ID` (0 to num_workers-1)
 - `max_concurrent_sessions` (optional, default: 50, max: 1000): Maximum total replay sessions running simultaneously across all dates
 - `max_retries` (optional, default: 3): Number of retry attempts for failed sessions
+- `delete_successful_queries` (optional, default: true): If true, automatically delete successfully completed queries after orchestrator finishes. Set to false to keep successful queries for inspection
+- `delete_failed_queries` (optional, default: false): If true, automatically delete failed queries after orchestrator finishes. Set to true to clean up failed queries. By default, failed queries are preserved for debugging
 
 ### Replay Settings
 
@@ -276,28 +278,7 @@ targetCycleDurationMillis = 1000 / replay_speed
 
   Each entry sets `-DReplayDatabase.TimestampColumn.{namespace}.{table}={column}`
 
-**Note:** The framework automatically uses `ReplayScript` configuration type and fixed replay time type, which are optimal for backtesting scenarios.
-
-### Scheduler
-
-```yaml
-scheduler:
-  calendar: "USNYSE"
-  start_time: "09:30:00"
-  stop_time: "16:00:00"
-  timezone: "America/New_York"
-  business_days: true
-```
-
-The `scheduler` section is **optional**. If present, it configures the Deephaven internal scheduler for the Persistent Query, which controls when the PQ automatically starts and stops each day. These parameters are passed to [`GenerateScheduling.generate_daily_scheduler()`](https://deephaven.io/enterprise/docs/python-client/persistent-query-api/). If the section is omitted, the Persistent Query runs immediately upon creation without time-of-day constraints.
-
-**Parameters (all required if section is present):**
-
-- `calendar` (required): Business calendar for determining valid trading days (e.g., `"USNYSE"`)
-- `start_time` (required): Time when PQ starts each day, format `HH:MM:SS`
-- `stop_time` (required): Time when PQ stops each day, format `HH:MM:SS`
-- `timezone` (required): Timezone for scheduler times (e.g., `"America/New_York"`)
-- `business_days` (required): If `true`, only run on business days according to the calendar
+**Note:** The framework automatically uses `ReplayScript` configuration type and fixed replay time type, which are optimal for backtesting scenarios. Persistent queries run immediately upon creation with a disabled scheduler (no time-of-day constraints).
 
 ### Date Range
 
@@ -461,10 +442,10 @@ The orchestrator configures replay persistent queries with:
 
 - **Replay Date**: Set in `typeSpecificFieldsJson.replayDate`
 - **Replay Speed**: Set in `typeSpecificFieldsJson.replaySpeed`
-- **Replay Time**: Set in `typeSpecificFieldsJson.replayTime`
+- **Replay Start Time**: Set in `typeSpecificFieldsJson.replayStart` (simulated time, not execution time)
 - **Sorted Replay**: Set in `typeSpecificFieldsJson.sortedReplay`
 - **JVM Arguments**: Advanced replay settings via `-DReplayDatabase.*`
-- **Scheduler**: Calendar, time windows, timezone (Deephaven internal PQ scheduler)
+- **Scheduler**: Disabled scheduler (immediate execution without time constraints)
 
 ## Best Practices
 
@@ -496,7 +477,6 @@ Common validation errors:
 - Invalid value ranges (heap_size_gb > 512, num_workers > 1000, replay_speed > 1000)
 - Wrong types (env must be a dictionary, not null)
 - Invalid date format (must be YYYY-MM-DD)
-- Scheduler section incomplete (all 5 fields required if present)
 
 ### Authentication Errors
 
@@ -581,10 +561,6 @@ The orchestrator validates all configuration before execution. Here's a quick re
 | `dates.end` | string | YYYY-MM-DD | - | Yes |
 | `weekdays_only` | bool | true/false | false | No |
 | `env` | dict | must be dict | - | Yes (can be empty `{}`) |
-| `scheduler` | dict | all 5 fields if present | - | No (omit entirely or include all fields) |
-| `scheduler.start_time` | string | HH:MM:SS | - | Yes (if scheduler present) |
-| `scheduler.stop_time` | string | HH:MM:SS | - | Yes (if scheduler present) |
-| `scheduler.business_days` | bool | true/false | - | Yes (if scheduler present) |
 
 ## Requirements
 

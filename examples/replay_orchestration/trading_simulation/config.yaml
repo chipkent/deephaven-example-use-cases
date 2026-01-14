@@ -27,13 +27,6 @@ replay:
   #     table: "Trade"
   #     column: "EventTime"
 
-scheduler:
-  calendar: "USNYSE"
-  start_time: "09:30:00"
-  stop_time: "16:00:00"
-  timezone: "America/New_York"
-  business_days: true
-  
 dates:
   start: "2024-01-01"
   end: "2024-12-31"
