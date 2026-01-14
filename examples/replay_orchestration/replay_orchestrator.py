@@ -167,8 +167,8 @@ class ReplayOrchestrator:
             speed = config['replay']['replay_speed']
             if speed < 1.0:
                 raise ValueError(f"replay_speed must be >= 1.0 for backtesting (got {speed})")
-            if speed > 1000.0:
-                raise ValueError(f"replay_speed too high (got {speed}, max 1000)")
+            if speed > 100.0:
+                raise ValueError(f"replay_speed too high (got {speed}, max 100).")
         
         if 'heap_size_gb' in config['replay']:
             heap = config['replay']['heap_size_gb']
@@ -422,6 +422,21 @@ class ReplayOrchestrator:
         
         if 'buffer_rows' in self.config['replay']:
             jvm_args.append(f"-DReplayDatabase.BufferSize={self.config['replay']['buffer_rows']}")
+        
+        # Automatically scale targetCycleDurationMillis to maintain simulated update frequency
+        # At 1x speed, cycles run at ~1000ms. At higher speeds, we scale proportionally to maintain
+        # the same simulated frequency. Formula: 1000ms / replay_speed
+        # Example: 60x speed → 16ms cycles maintains the same simulated update frequency as 1x
+        replay_speed = self.config['replay'].get('replay_speed', 1.0)
+        if replay_speed > 1.0:
+            target_cycle_ms = int(1000 / replay_speed)
+            if target_cycle_ms < 10:
+                raise ValueError(
+                    f"replay_speed={replay_speed} results in targetCycleDurationMillis={target_cycle_ms}ms, "
+                    f"which is below the 10ms minimum. Maximum replay_speed is 100."
+                )
+            jvm_args.append(f"-DPeriodicUpdateGraph.targetCycleDurationMillis={target_cycle_ms}")
+            logger.debug(f"Auto-configured targetCycleDurationMillis={target_cycle_ms}ms for replay_speed={replay_speed}x to maintain simulated update frequency")
         
         if 'replay_timestamp_columns' in self.config['replay']:
             for ts_config in self.config['replay']['replay_timestamp_columns']:

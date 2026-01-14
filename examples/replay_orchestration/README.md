@@ -232,11 +232,31 @@ replay:
 **Replay Behavior:**
 
 - `replay_time` (optional, default: `"09:30:00"`): Time when replay starts each day, format `HH:MM:SS`
-- `replay_speed` (optional, default: 1.0): Speed multiplier for replay (range: 1.0-1000.0)
+- `replay_speed` (optional, default: 1.0): Speed multiplier for replay (range: 1.0-100.0)
   - `1.0` = real-time (1 historical second = 1 replay second)
   - `10.0` = 10x speed for faster backtesting
-  - Higher values = faster backtesting, up to 1000x
+  - `100.0` = maximum speed (limited to ensure update cycles stay >= 10ms)
 - `sorted_replay` (optional, default: true): Guarantee timestamp-ordered data delivery
+
+**Automatic Update Frequency Scaling:**
+
+When `replay_speed` > 1.0, the orchestrator **automatically** sets `PeriodicUpdateGraph.targetCycleDurationMillis` to maintain the simulated update frequency.
+
+**How it works**: In real-time replay (1x speed), update cycles run at ~1 second, processing 1 second of historical data per cycle. At higher speeds, the orchestrator scales the update cycle duration to maintain the same simulated update frequency. The formula is:
+
+```python
+targetCycleDurationMillis = 1000 / replay_speed
+```
+
+**Examples**:
+
+- `replay_speed: 10` → 100ms cycle duration (maintains 10 Hz simulated update frequency)
+- `replay_speed: 60` → 16ms cycle duration (maintains 60 Hz simulated update frequency)
+- `replay_speed: 100` → 10ms cycle duration (maintains 100 Hz simulated update frequency)
+
+**Minimum**: Target cycle duration cannot go below 10ms, which limits `replay_speed` to a maximum of 100.
+
+**Note**: If your script is complex and cannot complete within the target cycle duration, Deephaven will add more data to subsequent cycles to catch up, potentially causing performance issues. Ensure your queries can execute within the scaled cycle time.
 
 **Replay Database Settings:**
 
