@@ -1,4 +1,5 @@
 import os
+import sys
 from deephaven import new_table
 from deephaven.column import string_col, int_col
 from deephaven.time import dh_today
@@ -22,8 +23,9 @@ worker_status = new_table([
     string_col("Date", [simulation_date]),
     int_col("WorkerID", [worker_id]),
     int_col("NumWorkers", [num_workers]),
-    string_col("Status", ["COMPLETED"]),
-    string_col("Message", [f"Worker {worker_id} processed date {simulation_date}"])
+    string_col("Status", ["RUNNING"]),
+    string_col("Message", [f"Worker {worker_id} processing date {simulation_date}"])
 ])
 
 print(f"[{log_level}] Simple Worker Completed Successfully")
+sys.exit(0)

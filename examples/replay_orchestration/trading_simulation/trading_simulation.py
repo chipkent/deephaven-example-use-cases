@@ -1,9 +1,11 @@
 import os
+import sys
+import time
 from deephaven import new_table, DynamicTableWriter, time_table, agg
 from deephaven.column import string_col, double_col
 import deephaven.dtypes as dht
 from deephaven.updateby import ema_time, emstd_time, cum_min
-from deephaven.time import dh_today
+from deephaven.time import dh_today, dh_now, to_j_instant
 
 simulation_name = os.getenv("SIMULATION_NAME")
 simulation_date = os.getenv("SIMULATION_DATE")
@@ -140,3 +142,38 @@ trade_summary = trades.agg_by([
 print(f"[INFO] Trading simulation running for {len(symbol_list)} symbols")
 print(f"[INFO] Worker {worker_id} will write results to partitioned tables")
 print(f"[INFO] Trading Simulation Worker Initialized Successfully")
+
+############################################################################################################
+# Monitor until market close and exit
+############################################################################################################
+
+print(f"[INFO] Monitoring until market close...")
+
+# Monitor dh_now() and exit at market close (16:00:00 in scheduler)
+end_time = to_j_instant(f"{dh_today()}T16:00:00 ET")
+check_interval = 10  # Check every 10 seconds
+
+# Track start times for speedup calculation
+start_simulation_time = dh_now()
+start_real_time = time.time()
+
+while True:
+    current_time = dh_now()
+    current_real_time = time.time()
+    
+    # Calculate actual speedup
+    elapsed_sim_nanos = (current_time.toEpochMilli() - start_simulation_time.toEpochMilli()) * 1_000_000
+    elapsed_real_nanos = (current_real_time - start_real_time) * 1_000_000_000
+    actual_speedup = elapsed_sim_nanos / elapsed_real_nanos if elapsed_real_nanos > 0 else 0.0
+    
+    print(f"[INFO] Current time: {current_time}, End time: {end_time}, Actual speedup: {actual_speedup:.2f}x")
+    
+    if current_time >= end_time:
+        print(f"[INFO] Market close reached at {current_time}, exiting...")
+        print(f"[INFO] Trading Simulation Worker Completed Successfully")
+        sys.exit(0)
+    
+    # Sleep to avoid busy-waiting (real-time sleep, not simulation time)
+    time.sleep(check_interval)
+
+print(f"[INFO] Trading Simulation Worker Completed Successfully")
