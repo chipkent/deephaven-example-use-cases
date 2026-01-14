@@ -120,7 +120,7 @@ This validates your configuration without creating any sessions.
 replay-orchestrator --config simple_worker/config.yaml
 ```
 
-This will create 6 replay sessions (3 dates × 2 workers per date). Monitor progress in the console output. Press Ctrl+C to gracefully stop (finishes current operations before exiting).
+This will create 10 replay sessions (5 weekdays × 2 workers per date). Monitor progress in the console output. Press Ctrl+C to gracefully stop (finishes current operations before exiting).
 
 ## Command-Line Options
 
@@ -166,7 +166,7 @@ name: "my_simulation"
 **Parameters:**
 
 - `name` (required): Unique identifier for this simulation run. Used to:
-  - Namespace persistent query names (format: `replay_{name}_{date}_{worker_id}`)
+  - Namespace persistent query names (format: `replay_{name}_{YYYYMMDD}_{worker_id}`, e.g., `replay_mysim_20240115_0`)
   - Avoid conflicts when running multiple simulations
   - Available to worker scripts via `SIMULATION_NAME` environment variable
 
@@ -187,7 +187,7 @@ deephaven:
 - `auth_method` (required): Authentication method. Values: `"password"` or `"private_key"`
 - `username` (required): Username for authentication. Supports `${VAR}` env var expansion
 - `password` (required for password auth): Password for authentication. Supports `${VAR}` env var expansion
-- `private_key_path` (required for private_key auth): Path to private key file (absolute or relative to config file)
+- `private_key_path` (required for private_key auth): Path to private key file (absolute or relative to config file directory)
 
 **Note:** Replay sessions are automatically distributed across available query servers by Deephaven Enterprise for optimal load balancing.
 
@@ -203,7 +203,7 @@ execution:
 
 **Parameters:**
 
-- `worker_script` (required): Path to worker Python script, relative to config file directory
+- `worker_script` (required): Path to worker Python script (absolute or relative to config file directory)
 - `num_workers` (required): Number of parallel workers per date (range: 1-1000). Each worker receives a unique `WORKER_ID` (0 to num_workers-1)
 - `max_concurrent_sessions` (optional, default: 50, max: 1000): Maximum total replay sessions running simultaneously across all dates
 - `max_retries` (optional, default: 3): Number of retry attempts for failed sessions
@@ -234,8 +234,8 @@ replay:
 
 **Replay Behavior:**
 
-- `replay_time` (optional, default: `"09:30:00"`): Time when replay starts each day, format `HH:MM:SS`
-- `replay_speed` (optional, default: 1.0): Speed multiplier for replay (range: 1.0-100.0)
+- `replay_start` (required): Time when replay starts each day, format `HH:MM:SS`
+- `replay_speed` (required): Speed multiplier for replay (range: 1.0-100.0)
   - `1.0` = real-time (1 historical second = 1 replay second)
   - `10.0` = 10x speed for faster backtesting
   - `100.0` = maximum speed (limited to ensure update cycles stay >= 10ms)
@@ -263,7 +263,7 @@ targetCycleDurationMillis = 1000 / replay_speed
 
 **Replay Database Settings:**
 
-- `buffer_rows` (optional, default: 10000): Number of rows to buffer during replay (sets `-DReplayDatabase.BufferSize`). See [Replay Database Settings](https://deephaven.io/enterprise/docs/deephaven-database/replayer/) for details.
+- `buffer_rows` (optional): Number of rows to buffer during replay (sets `-DReplayDatabase.BufferSize`). See [Replay Database Settings](https://deephaven.io/enterprise/docs/deephaven-database/replayer/) for details.
 - `replay_timestamp_columns` (optional): List of per-table timestamp column configurations. **Only required if your tables use a timestamp column name other than `Timestamp`**. By default, replay automatically uses the `Timestamp` column, or if a table has only one `Instant` column, it uses that. Specify this parameter to override the default for specific tables:
 
   ```yaml
@@ -362,7 +362,7 @@ Location: [`simple_worker/`](simple_worker/)
 
 **What it does**: Creates a status table showing which worker processed which date.
 
-**Scale**: 2 workers per date × 3 weekdays (Jan 1-5, 2024) = 6 sessions
+**Scale**: 2 workers per date × 5 weekdays (Jan 1-5, 2024) = 10 sessions
 
 See [`simple_worker/README.md`](simple_worker/README.md) for details.
 
@@ -474,7 +474,7 @@ python replay_orchestrator.py --config your_config.yaml --dry-run
 Common validation errors:
 
 - Missing required fields (name, heap_size_gb, worker_script, etc.)
-- Invalid value ranges (heap_size_gb > 512, num_workers > 1000, replay_speed > 1000)
+- Invalid value ranges (heap_size_gb > 512, num_workers > 1000, replay_speed > 100)
 - Wrong types (env must be a dictionary, not null)
 - Invalid date format (must be YYYY-MM-DD)
 
@@ -506,7 +506,7 @@ Example: If config is at `simple_worker/config.yaml` and specifies `worker_scrip
 Check Deephaven server logs for detailed error messages. Common issues:
 
 - **Insufficient heap size**: Increase `heap_size_gb` in config
-- **Invalid replay parameters**: Verify replay_time format (HH:MM:SS), replay_speed range (1.0-1000.0)
+- **Invalid replay parameters**: Verify replay_start format (HH:MM:SS), replay_speed range (1.0-100.0)
 - **Script syntax errors**: Test worker script independently before orchestration
 - **Missing environment variables**: Ensure DH_CONNECTION_URL, DH_USERNAME, DH_PASSWORD are set
 - **Connection refused**: Verify connection_url is correct and server is accessible
@@ -521,9 +521,10 @@ Ensure replay dates have available historical data in your Deephaven database. C
 
 ### Progress Stalls
 
-If you see "No progress for 10 iterations" warnings:
+If you see "No progress for 10 iterations" warnings (30 iterations during startup phase):
 
-- Check Deephaven server capacity (may be at max concurrent sessions)
+- **During startup**: This is normal as queries initialize and acquire workers (threshold: 30 iterations)
+- **After startup**: Check Deephaven server capacity (may be at max concurrent sessions)
 - Reduce `max_concurrent_sessions` if server is overloaded
 - Check for failed sessions in console output
 - Verify sessions aren't stuck in initialization (check `init_timeout_minutes`)
@@ -544,7 +545,10 @@ The orchestrator validates all configuration before execution. Here's a quick re
 | --------- | ---- | ------------ | ------- | -------- |
 | `name` | string | non-empty | - | Yes |
 | `connection_url` | string | non-empty | - | Yes |
+| `auth_method` | string | "password" or "private_key" | - | Yes |
 | `username` | string | non-empty | - | Yes |
+| `password` | string | non-empty | - | Conditional (password auth) |
+| `private_key_path` | string | non-empty | - | Conditional (private_key auth) |
 | `worker_script` | string | non-empty | - | Yes |
 | `heap_size_gb` | number | >0 to 512 | - | Yes |
 | `replay_start` | string | HH:MM:SS | - | Yes |
@@ -553,9 +557,12 @@ The orchestrator validates all configuration before execution. Here's a quick re
 | `num_workers` | int | 1-1000 | - | Yes |
 | `max_concurrent_sessions` | int | 1-1000 | 50 | No |
 | `max_retries` | int | ≥0 | 3 | No |
+| `delete_successful_queries` | bool | true/false | true | No |
+| `delete_failed_queries` | bool | true/false | false | No |
 | `init_timeout_minutes` | number | >0 | 1 | No |
-| `buffer_rows` | int | >0 | 10000 | No |
+| `buffer_rows` | int | >0 | - | No |
 | `sorted_replay` | bool | true/false | true | No |
+| `jvm_profile` | string | non-empty | "Default" | No |
 | `server_name` | string | non-empty | "AutoQuery" | No |
 | `dates.start` | string | YYYY-MM-DD | - | Yes |
 | `dates.end` | string | YYYY-MM-DD | - | Yes |
