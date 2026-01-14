@@ -42,7 +42,7 @@ execution:
   
 replay:
   heap_size_gb: 8.0            # More RAM for trading simulation
-  replay_speed: 10.0           # 10x speed for faster backtesting
+  replay_speed: 100.0          # 100x speed for faster backtesting
   
 dates:
   start: "2024-01-01"
@@ -132,4 +132,4 @@ To adapt for your use case:
 2. **Adjust strategy parameters**: Update `MAX_POSITION_DOLLARS`, `EMA_DECAY_TIME`, `LOT_SIZE` in `config.yaml`
 3. **Scale workers**: Increase `num_workers` to process more symbols in parallel
 4. **Adjust date range**: Modify `dates.start` and `dates.end` in `config.yaml`
-5. **Speed up replay**: Increase `replay_speed` for faster backtesting (currently 10x)
+5. **Speed up replay**: Increase `replay_speed` for faster backtesting (currently 100x)

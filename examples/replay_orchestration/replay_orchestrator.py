@@ -45,7 +45,6 @@ EXIT_BOTH_FAILURES = 3
 EXIT_ERROR = 4
 
 # Configuration constants
-DEFAULT_CONCURRENT_SESSIONS = 50
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_STATUS_TIMEOUT_SECONDS = 5
 DEFAULT_RETRY_DELAY_SECONDS = 1
@@ -136,7 +135,7 @@ class ReplayOrchestrator:
         # Define required and optional fields for each section
         required_fields = {
             'deephaven': ['connection_url', 'auth_method', 'username'],
-            'execution': ['worker_script', 'num_workers'],
+            'execution': ['worker_script', 'num_workers', 'max_concurrent_sessions'],
             'replay': ['heap_size_gb', 'replay_start', 'replay_speed', 'script_language'],
             'dates': ['start', 'end']
         }
@@ -1016,7 +1015,7 @@ class ReplayOrchestrator:
         total_tasks = len(tasks)
         
         # Configuration
-        max_concurrent = self.config['execution'].get('max_concurrent_sessions', DEFAULT_CONCURRENT_SESSIONS)
+        max_concurrent = self.config['execution']['max_concurrent_sessions']
         max_retries = self.config['execution'].get('max_retries', DEFAULT_MAX_RETRIES)
         self._print_config_summary(total_tasks, max_concurrent, max_retries)
         
