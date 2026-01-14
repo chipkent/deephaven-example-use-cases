@@ -683,7 +683,10 @@ class ReplayOrchestrator:
             pq_info_map: Map of serial -> PQ info from controller
             
         Returns:
-            'running', 'completed', 'failed', 'other', or None if not found
+            'completed', 'failed', 'active', or None if not found
+            
+        Notes:
+            'active' covers all non-terminal states (initializing, acquiring worker, running, etc.)
         """
         if self.dry_run:
             # In dry run, simulate completion
@@ -699,18 +702,15 @@ class ReplayOrchestrator:
         pq_info = pq_info_map[serial]
         status = pq_info.state.status
         
-        if self.session_mgr.controller_client.is_running(status):
-            return 'running'
-        elif self.session_mgr.controller_client.is_terminal(status):
+        if self.session_mgr.controller_client.is_terminal(status):
             status_name = self.session_mgr.controller_client.status_name(status)
             if status_name == 'PQS_COMPLETED':
                 return 'completed'
             else:
                 return 'failed'
         else:
-            status_name = self.session_mgr.controller_client.status_name(status)
-            logger.warning(f"Unexpected session status 'other' for session {session_key}: status={status}, status_name={status_name}")
-            return 'other'
+            # All non-terminal states: keep monitoring
+            return 'active'
     
     def _print_header(self):
         """Print orchestrator header."""
@@ -820,6 +820,7 @@ class ReplayOrchestrator:
                     logger.error(f"Session failed: date={date}, worker={worker_id}, status={status_name}")
                 else:
                     logger.error(f"Session failed: date={date}, worker={worker_id}")
+            # 'active' status: leave session in active_sessions and continue monitoring
         
         return completed_count, failed_count
     
