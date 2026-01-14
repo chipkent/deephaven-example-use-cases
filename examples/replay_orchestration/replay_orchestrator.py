@@ -13,6 +13,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import signal
 import sys
 import time
@@ -49,6 +50,12 @@ DEFAULT_MAX_RETRIES = 3
 DEFAULT_STATUS_TIMEOUT_SECONDS = 5
 DEFAULT_RETRY_DELAY_SECONDS = 1
 MAX_IDLE_ITERATIONS = 10  # Max iterations with no progress before warning
+MAX_IDLE_ITERATIONS_STARTUP = 30  # Higher threshold during startup phase
+
+# Persistent Query Configuration constants
+PQ_SERIAL_NEW = -2**63  # Sentinel value for new PQ (not yet created)
+DEFAULT_BUFFER_POOL_RATIO = 0.25  # Ratio of buffer pool to heap size
+DEFAULT_RESTART_USERS = 1  # Number of concurrent users for restart
 
 
 class ReplayOrchestrator:
@@ -93,6 +100,14 @@ class ReplayOrchestrator:
     
     def _validate_config(self, config: Dict):
         """Validate required configuration fields and reject unexpected ones."""
+        self._validate_config_structure(config)
+        self._validate_deephaven_config(config['deephaven'])
+        self._validate_execution_config(config['execution'])
+        self._validate_replay_config(config['replay'])
+        self._validate_dates_config(config['dates'])
+    
+    def _validate_config_structure(self, config: Dict):
+        """Validate top-level config structure, sections, and field presence."""
         # Define all expected sections
         expected_sections = {'name', 'deephaven', 'execution', 'replay', 'dates', 'env'}
         
@@ -139,7 +154,7 @@ class ReplayOrchestrator:
             'env': None  # env section can have arbitrary user-defined variables
         }
         
-        # Validate each section
+        # Validate each section has required fields and no unexpected fields
         for section, fields in required_fields.items():
             # Check required fields exist
             for field in fields:
@@ -155,22 +170,20 @@ class ReplayOrchestrator:
                         f"Unexpected fields in {section}: {', '.join(sorted(unexpected_fields))}. "
                         f"Allowed fields: {', '.join(sorted(allowed_fields[section]))}"
                     )
-        
+    
+    def _validate_deephaven_config(self, dh_config: Dict):
+        """Validate Deephaven connection and authentication configuration."""
         # Validate required string fields are non-empty
-        connection_url = config['deephaven']['connection_url']
+        connection_url = dh_config['connection_url']
         if not isinstance(connection_url, str) or not connection_url.strip():
             raise ValueError("connection_url must be a non-empty string")
         
-        username = config['deephaven']['username']
+        username = dh_config['username']
         if not isinstance(username, str) or not username.strip():
             raise ValueError("username must be a non-empty string")
         
-        worker_script = config['execution']['worker_script']
-        if not isinstance(worker_script, str) or not worker_script.strip():
-            raise ValueError("worker_script must be a non-empty string")
-        
         # Validate auth_method (required field)
-        auth_method = config['deephaven']['auth_method']
+        auth_method = dh_config['auth_method']
         if not isinstance(auth_method, str):
             raise ValueError(f"auth_method must be a string (got {type(auth_method).__name__})")
         if auth_method not in ['password', 'private_key']:
@@ -178,36 +191,27 @@ class ReplayOrchestrator:
         
         # Validate auth credentials based on method
         if auth_method == 'password':
-            if 'password' not in config['deephaven'] or not config['deephaven']['password']:
+            if 'password' not in dh_config or not dh_config['password']:
                 raise ValueError("password is required when auth_method is 'password'")
-            password = config['deephaven']['password']
+            password = dh_config['password']
             if not isinstance(password, str):
                 raise ValueError(f"password must be a string (got {type(password).__name__})")
         elif auth_method == 'private_key':
-            if 'private_key_path' not in config['deephaven'] or not config['deephaven']['private_key_path']:
+            if 'private_key_path' not in dh_config or not dh_config['private_key_path']:
                 raise ValueError("private_key_path is required when auth_method is 'private_key'")
-            private_key_path = config['deephaven']['private_key_path']
+            private_key_path = dh_config['private_key_path']
             if not isinstance(private_key_path, str) or not private_key_path.strip():
                 raise ValueError("private_key_path must be a non-empty string")
+    
+    def _validate_execution_config(self, exec_config: Dict):
+        """Validate execution configuration (workers, script, concurrency)."""
+        # Validate worker script path
+        worker_script = exec_config['worker_script']
+        if not isinstance(worker_script, str) or not worker_script.strip():
+            raise ValueError("worker_script must be a non-empty string")
         
-        # Validate numeric fields with type and bounds (required fields)
-        heap = config['replay']['heap_size_gb']
-        if not isinstance(heap, (int, float)):
-            raise ValueError(f"heap_size_gb must be a number (got {type(heap).__name__})")
-        if heap <= 0:
-            raise ValueError(f"heap_size_gb must be > 0 (got {heap})")
-        if heap > 512:
-            raise ValueError(f"heap_size_gb too high (got {heap}, max 512)")
-        
-        speed = config['replay']['replay_speed']
-        if not isinstance(speed, (int, float)):
-            raise ValueError(f"replay_speed must be a number (got {type(speed).__name__})")
-        if speed < 1.0:
-            raise ValueError(f"replay_speed must be >= 1.0 for backtesting (got {speed})")
-        if speed > 100.0:
-            raise ValueError(f"replay_speed too high (got {speed}, max 100).")
-        
-        workers = config['execution']['num_workers']
+        # Validate num_workers (required)
+        workers = exec_config['num_workers']
         if not isinstance(workers, int):
             raise ValueError(f"num_workers must be an integer (got {type(workers).__name__})")
         if workers <= 0:
@@ -216,8 +220,8 @@ class ReplayOrchestrator:
             raise ValueError(f"num_workers too high (got {workers}, max 1000)")
         
         # Validate optional numeric fields
-        if 'max_concurrent_sessions' in config['execution']:
-            concurrent = config['execution']['max_concurrent_sessions']
+        if 'max_concurrent_sessions' in exec_config:
+            concurrent = exec_config['max_concurrent_sessions']
             if not isinstance(concurrent, int):
                 raise ValueError(f"max_concurrent_sessions must be an integer (got {type(concurrent).__name__})")
             if concurrent <= 0:
@@ -225,74 +229,96 @@ class ReplayOrchestrator:
             if concurrent > 1000:
                 raise ValueError(f"max_concurrent_sessions too high (got {concurrent}, max 1000)")
         
-        if 'max_retries' in config['execution']:
-            retries = config['execution']['max_retries']
+        if 'max_retries' in exec_config:
+            retries = exec_config['max_retries']
             if not isinstance(retries, int):
                 raise ValueError(f"max_retries must be an integer (got {type(retries).__name__})")
             if retries < 0:
                 raise ValueError(f"max_retries must be >= 0 (got {retries})")
         
-        if 'delete_successful_queries' in config['execution']:
-            delete_successful = config['execution']['delete_successful_queries']
+        # Validate optional boolean fields
+        if 'delete_successful_queries' in exec_config:
+            delete_successful = exec_config['delete_successful_queries']
             if not isinstance(delete_successful, bool):
                 raise ValueError(f"delete_successful_queries must be a boolean (got {type(delete_successful).__name__})")
         
-        if 'delete_failed_queries' in config['execution']:
-            delete_failed = config['execution']['delete_failed_queries']
+        if 'delete_failed_queries' in exec_config:
+            delete_failed = exec_config['delete_failed_queries']
             if not isinstance(delete_failed, bool):
                 raise ValueError(f"delete_failed_queries must be a boolean (got {type(delete_failed).__name__})")
+    
+    def _validate_replay_config(self, replay_config: Dict):
+        """Validate replay configuration (heap, speed, replay settings)."""
+        # Validate heap_size_gb (required)
+        heap = replay_config['heap_size_gb']
+        if not isinstance(heap, (int, float)):
+            raise ValueError(f"heap_size_gb must be a number (got {type(heap).__name__})")
+        if heap <= 0:
+            raise ValueError(f"heap_size_gb must be > 0 (got {heap})")
+        if heap > 512:
+            raise ValueError(f"heap_size_gb too high (got {heap}, max 512)")
         
-        if 'init_timeout_minutes' in config['replay']:
-            timeout = config['replay']['init_timeout_minutes']
+        # Validate replay_speed (required)
+        speed = replay_config['replay_speed']
+        if not isinstance(speed, (int, float)):
+            raise ValueError(f"replay_speed must be a number (got {type(speed).__name__})")
+        if speed < 1.0:
+            raise ValueError(f"replay_speed must be >= 1.0 for backtesting (got {speed})")
+        if speed > 100.0:
+            raise ValueError(f"replay_speed too high (got {speed}, max 100).")
+        
+        # Validate optional timeout
+        if 'init_timeout_minutes' in replay_config:
+            timeout = replay_config['init_timeout_minutes']
             if not isinstance(timeout, (int, float)):
                 raise ValueError(f"init_timeout_minutes must be a number (got {type(timeout).__name__})")
             if timeout <= 0:
                 raise ValueError(f"init_timeout_minutes must be > 0 (got {timeout})")
         
-        if 'buffer_rows' in config['replay']:
-            buffer = config['replay']['buffer_rows']
+        # Validate optional buffer_rows
+        if 'buffer_rows' in replay_config:
+            buffer = replay_config['buffer_rows']
             if not isinstance(buffer, int):
                 raise ValueError(f"buffer_rows must be an integer (got {type(buffer).__name__})")
             if buffer <= 0:
                 raise ValueError(f"buffer_rows must be > 0 (got {buffer})")
         
-        # Validate replay_start format (HH:MM:SS)
-        import re
-        replay_start = config['replay']['replay_start']
+        # Validate replay_start format (HH:MM:SS, required)
+        replay_start = replay_config['replay_start']
         if not isinstance(replay_start, str):
             raise ValueError(f"replay_start must be a string (got {type(replay_start).__name__})")
         if not re.match(r'^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$', replay_start):
             raise ValueError(f"replay_start must be in HH:MM:SS format (got '{replay_start}')")
         
-        # Validate sorted_replay is boolean (optional, defaults to True)
-        if 'sorted_replay' in config['replay']:
-            sorted_replay = config['replay']['sorted_replay']
+        # Validate sorted_replay (optional boolean)
+        if 'sorted_replay' in replay_config:
+            sorted_replay = replay_config['sorted_replay']
             if not isinstance(sorted_replay, bool):
                 raise ValueError(f"sorted_replay must be a boolean (got {type(sorted_replay).__name__})")
         
-        # Validate script_language (required field)
-        lang = config['replay']['script_language']
+        # Validate script_language (required)
+        lang = replay_config['script_language']
         if not isinstance(lang, str):
             raise ValueError(f"script_language must be a string (got {type(lang).__name__})")
         if lang not in ['Python', 'Groovy']:
             raise ValueError(f"script_language must be 'Python' or 'Groovy' (got '{lang}')")
         
         # Validate optional jvm_profile
-        if 'jvm_profile' in config['replay']:
-            jvm_profile = config['replay']['jvm_profile']
+        if 'jvm_profile' in replay_config:
+            jvm_profile = replay_config['jvm_profile']
             if not isinstance(jvm_profile, str) or not jvm_profile.strip():
                 raise ValueError("jvm_profile must be a non-empty string")
         
         # Validate optional server_name
-        if 'server_name' in config['replay']:
-            server_name = config['replay']['server_name']
+        if 'server_name' in replay_config:
+            server_name = replay_config['server_name']
             # Note: Valid server names are environment-specific, so we don't validate the exact value here
             if not isinstance(server_name, str) or not server_name.strip():
                 raise ValueError(f"server_name must be a non-empty string (got '{server_name}')")
         
-        # Validate replay_timestamp_columns if specified
-        if 'replay_timestamp_columns' in config['replay']:
-            ts_cols = config['replay']['replay_timestamp_columns']
+        # Validate replay_timestamp_columns (optional list)
+        if 'replay_timestamp_columns' in replay_config:
+            ts_cols = replay_config['replay_timestamp_columns']
             if not isinstance(ts_cols, list):
                 raise ValueError("replay_timestamp_columns must be a list")
             for idx, ts_config in enumerate(ts_cols):
@@ -311,15 +337,17 @@ class ReplayOrchestrator:
                     value = ts_config[key]
                     if not isinstance(value, str) or not value.strip():
                         raise ValueError(f"replay_timestamp_columns[{idx}].{key} must be a non-empty string (got {type(value).__name__})")
-        
-        # Validate optional boolean fields
-        if 'weekdays_only' in config['dates']:
-            weekdays = config['dates']['weekdays_only']
+    
+    def _validate_dates_config(self, dates_config: Dict):
+        """Validate dates configuration (start, end, weekdays_only)."""
+        # Validate optional weekdays_only
+        if 'weekdays_only' in dates_config:
+            weekdays = dates_config['weekdays_only']
             if not isinstance(weekdays, bool):
                 raise ValueError(f"weekdays_only must be a boolean (got {type(weekdays).__name__})")
         
         # Validate date format and range
-        start_str = config['dates']['start']
+        start_str = dates_config['start']
         if not isinstance(start_str, str):
             raise ValueError(f"dates.start must be a string (got {type(start_str).__name__})")
         try:
@@ -327,7 +355,7 @@ class ReplayOrchestrator:
         except ValueError as e:
             raise ValueError(f"dates.start must be in YYYY-MM-DD format: {e}")
         
-        end_str = config['dates']['end']
+        end_str = dates_config['end']
         if not isinstance(end_str, str):
             raise ValueError(f"dates.end must be a string (got {type(end_str).__name__})")
         try:
@@ -337,7 +365,7 @@ class ReplayOrchestrator:
         
         # Validate date range logic
         if end_date < start_date:
-            raise ValueError(f"dates.end ({config['dates']['end']}) must be >= dates.start ({config['dates']['start']})")
+            raise ValueError(f"dates.end ({end_str}) must be >= dates.start ({start_str})")
     
     def _cleanup_sessions(self):
         """Stop and delete all tracked sessions. Idempotent - safe to call multiple times."""
@@ -381,9 +409,8 @@ class ReplayOrchestrator:
     
     def _handle_shutdown_signal(self, signum, frame):
         """Handle shutdown signals gracefully."""
-        logger.warning("\nShutdown signal received. Cleaning up sessions...")
+        logger.warning("\nShutdown signal received. Stopping orchestrator...")
         self.shutdown_requested = True
-        self._cleanup_sessions()
     
     def _expand_env_vars(self, config: Dict[str, Any]):
         """Expand environment variables in config values."""
@@ -445,6 +472,21 @@ class ReplayOrchestrator:
             logger.error(f"Failed to connect to {connection_url}")
             raise ConnectionError(f"Failed to connect to Deephaven Enterprise") from e
         
+        # Wrap authentication in try-except to cleanup SessionManager on failure
+        try:
+            self._authenticate_session()
+        except Exception:
+            # Clean up session manager on authentication failure
+            if self.session_mgr:
+                try:
+                    # SessionManager may not have explicit close, but clear reference
+                    self.session_mgr = None
+                except Exception:
+                    pass
+            raise
+    
+    def _authenticate_session(self):
+        """Perform authentication with session manager (extracted for error handling)."""
         auth_method = self.config['deephaven']['auth_method']
         
         if auth_method == 'password':
@@ -493,7 +535,7 @@ class ReplayOrchestrator:
         config_msg = PersistentQueryConfigMessage()
         
         # Basic fields
-        config_msg.serial = -2**63
+        config_msg.serial = PQ_SERIAL_NEW
         config_msg.version = 1
         config_msg.configurationType = "ReplayScript"
         config_msg.name = f"replay_{self.config['name']}_{date.replace('-', '')}_{worker_id}"
@@ -501,12 +543,12 @@ class ReplayOrchestrator:
         config_msg.enabled = True
         config_msg.serverName = self.config['replay'].get('server_name', 'AutoQuery')
         config_msg.heapSizeGb = self.config['replay']['heap_size_gb']
-        config_msg.bufferPoolToHeapRatio = 0.25
+        config_msg.bufferPoolToHeapRatio = DEFAULT_BUFFER_POOL_RATIO
         config_msg.detailedGCLoggingEnabled = True
         config_msg.scriptLanguage = self.config['replay']['script_language']
         config_msg.jvmProfile = self.config['replay'].get('jvm_profile', 'Default')
         config_msg.workerKind = "DeephavenCommunity"
-        config_msg.restartUsers = 1
+        config_msg.restartUsers = DEFAULT_RESTART_USERS
         
         # Initialization timeout (default: 60 seconds)
         init_timeout_minutes = self.config['replay'].get('init_timeout_minutes', 1)
@@ -516,18 +558,12 @@ class ReplayOrchestrator:
         if self.worker_script_content is None:
             worker_script_path = Path(self.config['execution']['worker_script'])
             
-            # Validate and resolve worker script path
+            # Resolve worker script path (supports both absolute and relative paths)
             if worker_script_path.is_absolute():
                 worker_script = worker_script_path.resolve()
             else:
+                # Relative paths are resolved relative to config directory
                 worker_script = (self.config_path.parent / worker_script_path).resolve()
-            
-            # Security: Ensure script is under config directory or absolute trusted path
-            if not worker_script_path.is_absolute():
-                try:
-                    worker_script.relative_to(self.config_path.parent)
-                except ValueError:
-                    raise ValueError(f"Worker script path escapes config directory: {worker_script}")
             
             if not worker_script.exists():
                 raise FileNotFoundError(f"Worker script not found: {worker_script}")
@@ -642,8 +678,23 @@ class ReplayOrchestrator:
             logger.info(f"Session created: date={date}, worker={worker_id}, serial={serial}")
             return True, serial
             
-        except (ConnectionError, TimeoutError, ValueError) as e:
-            logger.error(f"Failed to create session: date={date}, worker={worker_id}, error={e}")
+        except (ConnectionError, TimeoutError) as e:
+            logger.error(
+                f"Failed to create session (connection/timeout): date={date}, worker={worker_id}, "
+                f"error={e}. Check network connectivity and server availability."
+            )
+            return False, None
+        except ValueError as e:
+            logger.error(
+                f"Failed to create session (configuration error): date={date}, worker={worker_id}, "
+                f"error={e}. Review worker script and replay configuration."
+            )
+            return False, None
+        except Exception as e:
+            logger.error(
+                f"Failed to create session (unexpected error): date={date}, worker={worker_id}, "
+                f"error={type(e).__name__}: {e}"
+            )
             return False, None
     
     def _generate_session_tasks(self) -> List[Tuple[str, int]]:
@@ -777,6 +828,9 @@ class ReplayOrchestrator:
                 created_count += 1
                 map_needs_refresh = True  # Map is stale after creation
                 
+                # Clean up retry tracking for successful creation
+                self.retry_counts.pop(session_key, None)
+                
                 logger.info(f"Created session {len(self.sessions)}/{total_tasks}: date={date}, worker={worker_id}, serial={serial}")
             else:
                 # Handle creation failure
@@ -790,6 +844,8 @@ class ReplayOrchestrator:
                     time.sleep(DEFAULT_RETRY_DELAY_SECONDS)
                 else:
                     self.failed_sessions.append(session_key)
+                    # Clean up retry tracking after final failure
+                    self.retry_counts.pop(session_key, None)
                     logger.error(f"Failed to create session after {max_retries} retries: date={date}, worker={worker_id}")
         
         return created_count, map_needs_refresh
@@ -826,9 +882,16 @@ class ReplayOrchestrator:
                 serial = self.sessions.get(session_key)
                 if serial and serial in pq_info_map:
                     status_name = self.session_mgr.controller_client.status_name(pq_info_map[serial].state.status)
-                    logger.error(f"Session failed: date={date}, worker={worker_id}, status={status_name}")
+                    logger.error(
+                        f"Session failed: date={date}, worker={worker_id}, serial={serial}, status={status_name}. "
+                        f"Check persistent query logs for serial {serial} for details. "
+                        f"Common causes: script errors, insufficient heap memory, missing data."
+                    )
                 else:
-                    logger.error(f"Session failed: date={date}, worker={worker_id}")
+                    logger.error(
+                        f"Session failed: date={date}, worker={worker_id}. "
+                        f"Session info not available in PQ map."
+                    )
             # 'active' status: leave session in active_sessions and continue monitoring
         
         return completed_count, failed_count
@@ -865,7 +928,11 @@ class ReplayOrchestrator:
             try:
                 pq_info_map, new_version = self.session_mgr.controller_client.map_and_version()
                 return pq_info_map, new_version
-            except Exception:
+            except (TimeoutError, ConnectionError) as e2:
+                logger.debug(f"Map refresh also failed: {e2}")
+                return {}, map_version
+            except Exception as e2:
+                logger.warning(f"Unexpected error refreshing map: {type(e2).__name__}: {e2}")
                 return {}, map_version
     
     def _delete_queries(self, delete_successful: bool, delete_failed: bool):
@@ -968,6 +1035,7 @@ class ReplayOrchestrator:
         # Progress tracking
         idle_iterations = 0
         last_progress_count = 0
+        startup_phase = True  # Use higher threshold during startup when queries are initializing
         
         while (pending_tasks or active_sessions) and not self.shutdown_requested:
             # Launch new sessions up to capacity
@@ -987,16 +1055,31 @@ class ReplayOrchestrator:
             completed += completed_delta
             failed += failed_delta
             
+            # Exit startup phase once first session completes or fails
+            if startup_phase and (completed > 0 or failed > 0):
+                startup_phase = False
+                logger.debug("Exiting startup phase, sessions are progressing")
+            
             # Track progress to detect stalls
             current_progress = created + completed + failed
             if current_progress == last_progress_count:
                 idle_iterations += 1
-                if idle_iterations >= MAX_IDLE_ITERATIONS:
-                    logger.warning(
-                        f"No progress for {MAX_IDLE_ITERATIONS} iterations. "
-                        f"Created: {created}, Active: {len(active_sessions)}, Pending: {len(pending_tasks)}, "
-                        f"Completed: {completed}, Failed: {failed}"
-                    )
+                # Use higher threshold during startup when queries are initializing
+                threshold = MAX_IDLE_ITERATIONS_STARTUP if startup_phase else MAX_IDLE_ITERATIONS
+                if idle_iterations >= threshold:
+                    if startup_phase:
+                        logger.warning(
+                            f"Sessions initializing ({threshold} iterations without progress). "
+                            f"Created: {created}, Active: {len(active_sessions)}, Pending: {len(pending_tasks)}. "
+                            f"This is normal during startup as queries initialize and acquire workers."
+                        )
+                    else:
+                        logger.warning(
+                            f"No progress for {threshold} iterations. "
+                            f"Created: {created}, Active: {len(active_sessions)}, Pending: {len(pending_tasks)}, "
+                            f"Completed: {completed}, Failed: {failed}. "
+                            f"If stuck, check server logs and query status in the UI."
+                        )
                     idle_iterations = 0  # Reset after warning
             else:
                 idle_iterations = 0
@@ -1011,7 +1094,7 @@ class ReplayOrchestrator:
             logger.warning(f"Orchestrator stopped by user. Active sessions: {len(active_sessions)}, Pending: {len(pending_tasks)}")
             self._cleanup_sessions()
         
-        # Delete queries based on configuration
+        # Delete queries based on configuration (before summary so deletion is included)
         delete_successful = self.config['execution'].get('delete_successful_queries', True)
         delete_failed = self.config['execution'].get('delete_failed_queries', False)
         if not self.dry_run:
