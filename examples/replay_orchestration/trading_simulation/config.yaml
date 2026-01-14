@@ -18,7 +18,7 @@ replay:
   init_timeout_minutes: 30
   script_language: "Python"
   jvm_profile: "Default"
-  replay_time: "09:30:00"
+  replay_start: "09:30:00"
   replay_speed: 10.0
   sorted_replay: true
   buffer_rows: 10000

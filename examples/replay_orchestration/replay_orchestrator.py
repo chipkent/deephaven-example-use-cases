@@ -121,7 +121,7 @@ class ReplayOrchestrator:
         required_fields = {
             'deephaven': ['connection_url', 'auth_method', 'username'],
             'execution': ['worker_script', 'num_workers'],
-            'replay': ['heap_size_gb'],
+            'replay': ['heap_size_gb', 'replay_start', 'replay_speed', 'script_language'],
             'dates': ['start', 'end']
         }
         
@@ -130,9 +130,9 @@ class ReplayOrchestrator:
             'execution': {'worker_script', 'num_workers', 'max_concurrent_sessions', 'max_retries'},
             'replay': {
                 'heap_size_gb', 'init_timeout_minutes',
-                'replay_time', 'replay_speed', 'sorted_replay',
+                'replay_start', 'replay_speed', 'sorted_replay',
                 'buffer_rows', 'replay_timestamp_columns',
-                'script_language', 'jvm_profile'
+                'script_language', 'jvm_profile', 'server_name'
             },
             'scheduler': {'calendar', 'start_time', 'stop_time', 'timezone', 'business_days'},
             'dates': {'start', 'end', 'weekdays_only'},
@@ -162,40 +162,111 @@ class ReplayOrchestrator:
         else:
             logger.debug("No scheduler configuration - PQ will run immediately without time constraints")
         
-        # Validate numeric fields with bounds
-        if 'replay_speed' in config['replay']:
-            speed = config['replay']['replay_speed']
-            if speed < 1.0:
-                raise ValueError(f"replay_speed must be >= 1.0 for backtesting (got {speed})")
-            if speed > 100.0:
-                raise ValueError(f"replay_speed too high (got {speed}, max 100).")
+        # Validate required string fields are non-empty
+        connection_url = config['deephaven']['connection_url']
+        if not isinstance(connection_url, str) or not connection_url.strip():
+            raise ValueError("connection_url must be a non-empty string")
         
-        if 'heap_size_gb' in config['replay']:
-            heap = config['replay']['heap_size_gb']
-            if heap <= 0:
-                raise ValueError(f"heap_size_gb must be > 0 (got {heap})")
-            if heap > 512:
-                raise ValueError(f"heap_size_gb too high (got {heap}, max 512)")
+        username = config['deephaven']['username']
+        if not isinstance(username, str) or not username.strip():
+            raise ValueError("username must be a non-empty string")
         
-        if 'num_workers' in config['execution']:
-            workers = config['execution']['num_workers']
-            if workers <= 0:
-                raise ValueError(f"num_workers must be > 0 (got {workers})")
-            if workers > 1000:
-                raise ValueError(f"num_workers too high (got {workers}, max 1000)")
+        worker_script = config['execution']['worker_script']
+        if not isinstance(worker_script, str) or not worker_script.strip():
+            raise ValueError("worker_script must be a non-empty string")
         
+        # Validate auth_method (required field)
+        auth_method = config['deephaven']['auth_method']
+        if auth_method not in ['password', 'private_key']:
+            raise ValueError(f"auth_method must be 'password' or 'private_key' (got '{auth_method}')")
+        
+        # Validate auth credentials based on method
+        if auth_method == 'password':
+            if 'password' not in config['deephaven'] or not config['deephaven']['password']:
+                raise ValueError("password is required when auth_method is 'password'")
+        elif auth_method == 'private_key':
+            if 'private_key_path' not in config['deephaven'] or not config['deephaven']['private_key_path']:
+                raise ValueError("private_key_path is required when auth_method is 'private_key'")
+        
+        # Validate numeric fields with type and bounds (required fields)
+        heap = config['replay']['heap_size_gb']
+        if not isinstance(heap, (int, float)):
+            raise ValueError(f"heap_size_gb must be a number (got {type(heap).__name__})")
+        if heap <= 0:
+            raise ValueError(f"heap_size_gb must be > 0 (got {heap})")
+        if heap > 512:
+            raise ValueError(f"heap_size_gb too high (got {heap}, max 512)")
+        
+        speed = config['replay']['replay_speed']
+        if not isinstance(speed, (int, float)):
+            raise ValueError(f"replay_speed must be a number (got {type(speed).__name__})")
+        if speed < 1.0:
+            raise ValueError(f"replay_speed must be >= 1.0 for backtesting (got {speed})")
+        if speed > 100.0:
+            raise ValueError(f"replay_speed too high (got {speed}, max 100).")
+        
+        workers = config['execution']['num_workers']
+        if not isinstance(workers, int):
+            raise ValueError(f"num_workers must be an integer (got {type(workers).__name__})")
+        if workers <= 0:
+            raise ValueError(f"num_workers must be > 0 (got {workers})")
+        if workers > 1000:
+            raise ValueError(f"num_workers too high (got {workers}, max 1000)")
+        
+        # Validate optional numeric fields
         if 'max_concurrent_sessions' in config['execution']:
             concurrent = config['execution']['max_concurrent_sessions']
+            if not isinstance(concurrent, int):
+                raise ValueError(f"max_concurrent_sessions must be an integer (got {type(concurrent).__name__})")
             if concurrent <= 0:
                 raise ValueError(f"max_concurrent_sessions must be > 0 (got {concurrent})")
             if concurrent > 1000:
                 raise ValueError(f"max_concurrent_sessions too high (got {concurrent}, max 1000)")
         
-        # Validate script_language if specified
-        if 'script_language' in config['replay']:
-            lang = config['replay']['script_language']
-            if lang not in ['Python', 'Groovy']:
-                raise ValueError(f"script_language must be 'Python' or 'Groovy' (got '{lang}')")
+        if 'max_retries' in config['execution']:
+            retries = config['execution']['max_retries']
+            if not isinstance(retries, int):
+                raise ValueError(f"max_retries must be an integer (got {type(retries).__name__})")
+            if retries < 0:
+                raise ValueError(f"max_retries must be >= 0 (got {retries})")
+        
+        if 'init_timeout_minutes' in config['replay']:
+            timeout = config['replay']['init_timeout_minutes']
+            if not isinstance(timeout, (int, float)):
+                raise ValueError(f"init_timeout_minutes must be a number (got {type(timeout).__name__})")
+            if timeout <= 0:
+                raise ValueError(f"init_timeout_minutes must be > 0 (got {timeout})")
+        
+        if 'buffer_rows' in config['replay']:
+            buffer = config['replay']['buffer_rows']
+            if not isinstance(buffer, int):
+                raise ValueError(f"buffer_rows must be an integer (got {type(buffer).__name__})")
+            if buffer <= 0:
+                raise ValueError(f"buffer_rows must be > 0 (got {buffer})")
+        
+        # Validate replay_start format (HH:MM:SS)
+        import re
+        replay_start = config['replay']['replay_start']
+        if not re.match(r'^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$', replay_start):
+            raise ValueError(f"replay_start must be in HH:MM:SS format (got '{replay_start}')")
+        
+        # Validate sorted_replay is boolean (optional, defaults to True)
+        if 'sorted_replay' in config['replay']:
+            sorted_replay = config['replay']['sorted_replay']
+            if not isinstance(sorted_replay, bool):
+                raise ValueError(f"sorted_replay must be a boolean (got {type(sorted_replay).__name__})")
+        
+        # Validate script_language (required field)
+        lang = config['replay']['script_language']
+        if lang not in ['Python', 'Groovy']:
+            raise ValueError(f"script_language must be 'Python' or 'Groovy' (got '{lang}')")
+        
+        # Validate optional server_name
+        if 'server_name' in config['replay']:
+            server_name = config['replay']['server_name']
+            # Note: Valid server names are environment-specific, so we don't validate the exact value here
+            if not isinstance(server_name, str) or not server_name.strip():
+                raise ValueError(f"server_name must be a non-empty string (got '{server_name}')")
         
         # Validate replay_timestamp_columns if specified
         if 'replay_timestamp_columns' in config['replay']:
@@ -214,6 +285,12 @@ class ReplayOrchestrator:
                 if unexpected_keys:
                     raise ValueError(f"replay_timestamp_columns[{idx}] has unexpected keys: {', '.join(sorted(unexpected_keys))}")
         
+        # Validate optional boolean fields
+        if 'weekdays_only' in config['dates']:
+            weekdays = config['dates']['weekdays_only']
+            if not isinstance(weekdays, bool):
+                raise ValueError(f"weekdays_only must be a boolean (got {type(weekdays).__name__})")
+        
         # Validate scheduler section if present - all fields are required
         if 'scheduler' in config:
             required_scheduler_fields = {'calendar', 'start_time', 'stop_time', 'timezone', 'business_days'}
@@ -224,16 +301,32 @@ class ReplayOrchestrator:
             unexpected_scheduler = actual_scheduler_fields - required_scheduler_fields
             if unexpected_scheduler:
                 raise ValueError(f"scheduler section has unexpected fields: {', '.join(sorted(unexpected_scheduler))}")
+            
+            # Validate scheduler field types and formats
+            if not isinstance(config['scheduler']['business_days'], bool):
+                raise ValueError(f"scheduler.business_days must be a boolean (got {type(config['scheduler']['business_days']).__name__})")
+            
+            # Validate time formats (HH:MM:SS)
+            for time_field in ['start_time', 'stop_time']:
+                time_val = config['scheduler'][time_field]
+                if not isinstance(time_val, str):
+                    raise ValueError(f"scheduler.{time_field} must be a string (got {type(time_val).__name__})")
+                if not re.match(r'^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$', time_val):
+                    raise ValueError(f"scheduler.{time_field} must be in HH:MM:SS format (got '{time_val}')")
         
-        # Validate date format
+        # Validate date format and range
         try:
-            datetime.strptime(config['dates']['start'], '%Y-%m-%d')
+            start_date = datetime.strptime(config['dates']['start'], '%Y-%m-%d')
         except ValueError as e:
             raise ValueError(f"dates.start must be in YYYY-MM-DD format: {e}")
         try:
-            datetime.strptime(config['dates']['end'], '%Y-%m-%d')
+            end_date = datetime.strptime(config['dates']['end'], '%Y-%m-%d')
         except ValueError as e:
             raise ValueError(f"dates.end must be in YYYY-MM-DD format: {e}")
+        
+        # Validate date range logic
+        if end_date < start_date:
+            raise ValueError(f"dates.end ({config['dates']['end']}) must be >= dates.start ({config['dates']['start']})")
     
     def _handle_shutdown_signal(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -353,12 +446,14 @@ class ReplayOrchestrator:
         config_msg.name = f"replay_{self.config['name']}_{date.replace('-', '')}_{worker_id}"
         config_msg.owner = self.config['deephaven']['username']
         config_msg.enabled = True
+        config_msg.serverName = self.config['replay'].get('server_name', 'AutoQuery')
         config_msg.heapSizeGb = self.config['replay']['heap_size_gb']
         config_msg.bufferPoolToHeapRatio = 0.25
         config_msg.detailedGCLoggingEnabled = True
-        config_msg.scriptLanguage = self.config['replay'].get('script_language', 'Python')
+        config_msg.scriptLanguage = self.config['replay']['script_language']
         config_msg.jvmProfile = self.config['replay'].get('jvm_profile', 'Default')
         config_msg.workerKind = "DeephavenCommunity"
+        config_msg.restartUsers = 1
         
         # Initialization timeout (default: 60 seconds)
         init_timeout_minutes = self.config['replay'].get('init_timeout_minutes', 1)
@@ -394,26 +489,39 @@ class ReplayOrchestrator:
         
         config_msg.scriptCode = self.worker_script_content
         
-        # Replay-specific fields (JSON)
-        replay_fields = {
-            "replayTimeType": "fixed",
-            "sortedReplay": self.config['replay'].get('sorted_replay', True),
-            "replayTime": self.config['replay'].get('replay_time', '09:30:00'),
-            "replayDate": date,
-            "replaySpeed": self.config['replay'].get('replay_speed', 1.0),
+        # Replay-specific fields (JSON) - must be wrapped in type/value structure
+        # Controller expects PascalCase which it maps to snake_case in ReplaySettings
+        # ReplaySorted uses boolean type, others use string type
+        encoded_fields = {
+            "ReplaySorted": {
+                "type": "boolean",
+                "value": self.config['replay'].get('sorted_replay', True)
+            },
+            "ReplayStart": {
+                "type": "string",
+                "value": self.config['replay']['replay_start']
+            },
+            "ReplayDate": {
+                "type": "string",
+                "value": date
+            },
+            "ReplaySpeed": {
+                "type": "string",
+                "value": str(self.config['replay']['replay_speed'])
+            }
         }
-        config_msg.typeSpecificFieldsJson = json.dumps(replay_fields)
+        config_msg.typeSpecificFieldsJson = json.dumps(encoded_fields)
         
-        # Environment variables
+        # Environment variables - must be in alternating name/value pairs
         env_vars = [
-            f"SIMULATION_NAME={self.config['name']}",
-            f"SIMULATION_DATE={date}",
-            f"WORKER_ID={worker_id}",
-            f"NUM_WORKERS={self.config['execution']['num_workers']}"
+            "SIMULATION_NAME", self.config['name'],
+            "SIMULATION_DATE", date,
+            "WORKER_ID", str(worker_id),
+            "NUM_WORKERS", str(self.config['execution']['num_workers'])
         ]
         
         for key, value in self.config['env'].items():
-            env_vars.append(f"{key}={value}")
+            env_vars.extend([key, str(value)])
         
         config_msg.extraEnvironmentVariables.extend(env_vars)
         
@@ -558,7 +666,8 @@ class ReplayOrchestrator:
             else:
                 return 'failed'
         else:
-            logger.warning(f"Unexpected session status 'other' for session {session_key}")
+            status_name = self.session_mgr.controller_client.status_name(status)
+            logger.warning(f"Unexpected session status 'other' for session {session_key}: status={status}, status_name={status_name}")
             return 'other'
     
     def _print_header(self):

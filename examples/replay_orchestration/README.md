@@ -216,7 +216,7 @@ replay:
   init_timeout_minutes: 10
   script_language: "Python"
   jvm_profile: "Default"
-  replay_time: "09:30:00"
+  replay_start: "09:30:00"
   replay_speed: 1.0
   sorted_replay: true
   buffer_rows: 10000
@@ -226,8 +226,9 @@ replay:
 
 - `heap_size_gb` (required): JVM heap size in GB allocated per session (range: >0 to 512, e.g., 4.0, 8.0)
 - `init_timeout_minutes` (optional, default: 1): How long to wait for PQ to initialize/start up, in minutes
-- `script_language` (optional, default: `"Python"`): Worker script language. Values: `"Python"` or `"Groovy"`
+- `script_language` (required): Worker script language. Values: `"Python"` or `"Groovy"`
 - `jvm_profile` (optional, default: `"Default"`): JVM profile defining resource limits and JVM arguments
+- `server_name` (optional, default: `"AutoQuery"`): Target query server name for replay sessions. The default `"AutoQuery"` uses the Deephaven load balancer to automatically distribute queries across available servers for optimal load balancing. You can specify a specific server name (e.g., `"Query_1"`, `"Query_2"`) to target a particular server if needed.
 
 **Replay Behavior:**
 
@@ -560,18 +561,30 @@ If Ctrl+C doesn't stop gracefully:
 The orchestrator validates all configuration before execution. Here's a quick reference:
 
 | Parameter | Type | Range/Values | Default | Required |
-|-----------|------|--------------|---------|----------|
+| --------- | ---- | ------------ | ------- | -------- |
 | `name` | string | non-empty | - | Yes |
-| `heap_size_gb` | float | >0 to 512 | - | Yes |
+| `connection_url` | string | non-empty | - | Yes |
+| `username` | string | non-empty | - | Yes |
+| `worker_script` | string | non-empty | - | Yes |
+| `heap_size_gb` | number | >0 to 512 | - | Yes |
+| `replay_start` | string | HH:MM:SS | - | Yes |
+| `replay_speed` | number | 1.0-100.0 | - | Yes |
+| `script_language` | string | "Python" or "Groovy" | - | Yes |
 | `num_workers` | int | 1-1000 | - | Yes |
 | `max_concurrent_sessions` | int | 1-1000 | 50 | No |
 | `max_retries` | int | ≥0 | 3 | No |
-| `replay_speed` | float | 1.0-1000.0 | 1.0 | No |
-| `script_language` | string | "Python" or "Groovy" | "Python" | No |
+| `init_timeout_minutes` | number | >0 | 1 | No |
+| `buffer_rows` | int | >0 | 10000 | No |
+| `sorted_replay` | bool | true/false | true | No |
+| `server_name` | string | non-empty | "AutoQuery" | No |
 | `dates.start` | string | YYYY-MM-DD | - | Yes |
 | `dates.end` | string | YYYY-MM-DD | - | Yes |
+| `weekdays_only` | bool | true/false | false | No |
 | `env` | dict | must be dict | - | Yes (can be empty `{}`) |
 | `scheduler` | dict | all 5 fields if present | - | No (omit entirely or include all fields) |
+| `scheduler.start_time` | string | HH:MM:SS | - | Yes (if scheduler present) |
+| `scheduler.stop_time` | string | HH:MM:SS | - | Yes (if scheduler present) |
+| `scheduler.business_days` | bool | true/false | - | Yes (if scheduler present) |
 
 ## Requirements
 
