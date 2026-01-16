@@ -67,27 +67,58 @@ Auto-generated:
 - `WORKER_ID`: Worker partition ID (0 to NUM_WORKERS-1) - this example uses it for stock partitioning
 - `NUM_WORKERS`: Total workers per date
 
-## Output Tables
+## Prerequisites
 
-Each worker creates:
+See the [main README](../README.md) for setup instructions. This example requires:
+- Deephaven Enterprise with FeedOS access for historical equity quote data
 
-- **`trades`**: All executed trades with Date, Timestamp, Symbol, Price, Size, WorkerID
-- **`positions`**: Current positions by symbol (cumulative shares held)
-- **`pnl`**: Profit and loss calculations per symbol
-- **`preds`**: Price predictions with EMA-based buy/sell thresholds
-- **`orders`**: Current trading signals and position status
-- **`executions`**: Snapshot of trade decisions every 10 seconds
-- **`trade_summary`**: Aggregated trade counts and total shares by symbol
+## Quick Start
 
-## Running
+**1. Configure** - Edit [`config.yaml`](config.yaml) to set date range and parameters. For testing, use a small date range (1-5 days).
 
+**2. Clean existing tables** - Run [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console and call `delete_all_tables()` to remove any previous simulation data.
+
+**3. Run** - From the `replay_orchestration` directory:
 ```bash
 replay-orchestrator --config trading_simulation/config.yaml
 ```
 
-**Note**: This requires Deephaven Enterprise with FeedOS access for historical equity quote data.
+This creates 2,500 sessions (10 workers × 250 trading days) and writes results to partitioned user tables in the `ExampleReplayTradingSim` namespace. Tables are auto-created on first write.
 
-## Expected Output
+## Output Tables
+
+Results are written to partitioned user tables in the namespace specified by `OUTPUT_NAMESPACE` (default: `"ExampleReplayTradingSim"`):
+
+- **`TradingSimTrades`**: All executed trades with Date, Timestamp, Symbol, Price, Size, WorkerID
+- **`TradingSimPositions`**: Current positions by symbol (cumulative shares held)
+- **`TradingSimPnl`**: Profit and loss calculations per symbol
+- **`TradingSimPreds`**: Price predictions with EMA-based buy/sell thresholds
+- **`TradingSimOrders`**: Current trading signals and position status
+- **`TradingSimExecutions`**: Periodic snapshots with action codes
+- **`TradingSimSummary`**: Aggregated trade counts and total shares by symbol
+
+All tables include partition columns: `SimulationName`, `WorkerID`, `Date`
+
+## Querying Results
+
+Use [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console to access results:
+
+```python
+# List tables and row counts
+list_tables()
+
+# Get tables for analysis
+trades = get_table("TradingSimTrades")
+pnl = get_table("TradingSimPnl")
+
+# Query the data
+trades.where("Sym = `AAPL`").tail(100)
+pnl.view(["Date", "Sym", "PnL"])
+```
+
+To delete all simulation data: `delete_all_tables()`
+
+## Expected Results
 
 After completion, you'll have:
 
