@@ -605,7 +605,8 @@ class ReplayOrchestrator:
             "SIMULATION_NAME", self.config['name'],
             "SIMULATION_DATE", date,
             "WORKER_ID", str(worker_id),
-            "NUM_WORKERS", str(self.config['execution']['num_workers'])
+            "NUM_WORKERS", str(self.config['execution']['num_workers']),
+            "QUERY_NAME", config_msg.name
         ]
         
         for key, value in self.config['env'].items():

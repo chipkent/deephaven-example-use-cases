@@ -312,20 +312,20 @@ The `env` section must be a dictionary (can be empty: `env: {}`, but cannot be `
 All variables defined in the `env` section are passed to every worker session. Use these for configuration parameters your worker script needs.
 
 **Auto-Generated Variables:**
-The orchestrator automatically sets these environment variables for each session:
 
-- `SIMULATION_NAME`: The simulation name from config (for namespacing outputs and logging)
-- `SIMULATION_DATE`: The date being processed, format `YYYY-MM-DD` (also available via [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today))
-- `WORKER_ID`: Worker identifier, range `0` to `NUM_WORKERS-1`, for partitioning data across workers
+The orchestrator automatically sets these environment variables for each worker session:
+
+- `SIMULATION_NAME`: The simulation name from the config
+- `SIMULATION_DATE`: The date being processed (YYYY-MM-DD string format)
+- `WORKER_ID`: Worker partition ID (0 to NUM_WORKERS-1) for dividing work across workers
 - `NUM_WORKERS`: Total number of workers per date
+- `QUERY_NAME`: The persistent query name (`replay_{name}_{YYYYMMDD}_{worker_id}`)
 
-**Note on SIMULATION_DATE**: While the replay date is also accessible via [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today) from the [`deephaven.time`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html) module, the `SIMULATION_DATE` environment variable provides an explicit string value for debugging purposes. [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today) is preferred for all date operations (including logging and table queries) because it works in both backtesting and non-backtesting scenarios.
+**Note:** For date operations in your worker script, use [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today) from the [`deephaven.time`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html) module rather than `SIMULATION_DATE`. The [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today) function works correctly in both replay and production environments.
 
 ## Creating a Worker Script
 
-Worker scripts receive environment variables and process data for their assigned date and worker ID.
-
-For date-based operations, you can use either the `SIMULATION_DATE` environment variable or [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today) from the [`deephaven.time`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html) module.
+Worker scripts access environment variables to determine their assigned work partition.
 
 ```python
 import os

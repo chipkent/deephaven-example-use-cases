@@ -9,7 +9,7 @@ deephaven:
 execution:
   worker_script: "trading_simulation.py"
   num_workers: 10
-  max_concurrent_sessions: 50
+  max_concurrent_sessions: 20
   
 replay:
   heap_size_gb: 8.0
@@ -28,6 +28,7 @@ dates:
   weekdays_only: true
   
 env:
+  OUTPUT_NAMESPACE: "ExampleReplayTradingSim"
   MAX_POSITION_DOLLARS: "10000"
   EMA_DECAY_TIME: "PT00:01:00"
   LOT_SIZE: "100"

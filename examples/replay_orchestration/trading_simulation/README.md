@@ -64,8 +64,8 @@ Auto-generated:
 
 - `SIMULATION_NAME`: Unique identifier for the simulation run
 - `SIMULATION_DATE`: Date being simulated - also available via [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today)
-- `WORKER_ID`: Which stock partition this worker handles (0 to NUM_WORKERS-1)
-- `NUM_WORKERS`: Total workers per date (for partitioning logic)
+- `WORKER_ID`: Worker partition ID (0 to NUM_WORKERS-1) - this example uses it for stock partitioning
+- `NUM_WORKERS`: Total workers per date
 
 ## Output Tables
 
