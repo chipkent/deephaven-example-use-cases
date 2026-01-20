@@ -41,7 +41,7 @@ execution:
   max_concurrent_sessions: 20  # Max total sessions running concurrently
   
 replay:
-  heap_size_gb: 8.0            # More RAM for trading simulation
+  heap_size_gb: 16.0           # More RAM for trading simulation
   replay_speed: 100.0          # 100x speed for faster backtesting
   
 dates:
