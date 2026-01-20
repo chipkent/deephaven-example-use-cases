@@ -135,7 +135,7 @@ All data will be queryable in Deephaven for analysis and visualization.
 
 **Worker Partitioning**: Symbols are distributed across workers using hash-based partitioning:
 ```python
-my_symbols = all_symbols.where(f"(int)(hashCode(Sym)) % {num_workers} == {worker_id}")
+my_symbols = all_symbols.where(f"Sym.hashCode() % {num_workers} == {worker_id}")
 ```
 
 **Mean-Reversion Strategy**:
