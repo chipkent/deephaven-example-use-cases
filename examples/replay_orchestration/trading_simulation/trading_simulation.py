@@ -74,7 +74,7 @@ all_symbols = new_table([
 
 my_symbols = all_symbols.where(f"Sym.hashCode() % {num_partitions} == {partition_id}")
 
-print(f"[INFO] This worker handles {my_symbols.size} symbols")
+print(f"[INFO] This partition handles {my_symbols.size} symbols")
 
 ############################################################################################################
 # Create simulated trade and position tables
