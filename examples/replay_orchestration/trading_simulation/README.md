@@ -4,7 +4,7 @@ A market maker simulation based on mean-reversion strategy, designed to backtest
 
 ## Overview
 
-This example implements a complete trading simulation based on [`examples/finance/simulated_market_maker`](../../finance/simulated_market_maker). It demonstrates how to run large-scale backtests by partitioning stocks across multiple workers and processing historical dates in parallel.
+This example implements a complete trading simulation based on [`examples/finance/simulated_market_maker`](../../finance/simulated_market_maker). It demonstrates how to run large-scale backtests by partitioning stocks across multiple partitions and processing historical dates in parallel.
 
 ## Implementation
 
@@ -17,31 +17,31 @@ Mean-reversion market making:
 - Sell when bid price rises above (predicted price + 1 SD)
 - Manage risk through per-symbol position limits
 
-### Worker Partitioning
+### Data Partitioning
 
-Each worker processes a subset of stocks:
+Each partition processes a subset of stocks:
 
 ```python
-worker_id = int(os.getenv("WORKER_ID"))      # 0-9 for this date
-num_workers = int(os.getenv("NUM_WORKERS"))  # 10 workers per date
+partition_id = int(os.getenv("PARTITION_ID"))      # 0-1 for this date
+num_partitions = int(os.getenv("NUM_PARTITIONS"))  # 2 partitions per date
 
 # Symbols are distributed using hash-based partitioning
-my_symbols = all_symbols.where(f"Sym.hashCode() % {num_workers} == {worker_id}")
+my_symbols = all_symbols.where(f"Sym.hashCode() % {num_partitions} == {partition_id}")
 ```
 
-**Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in `trading_simulation.py`.
+**Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in [`trading_simulation.py`](trading_simulation.py).
 
 ### Configuration
 
-This example is configured for large-scale backtesting:
+Key configuration settings:
 
 ```yaml
 execution:
-  num_workers: 10              # 10 workers per date (each processes a subset of stocks)
-  max_concurrent_sessions: 20  # Max total sessions running concurrently
+  num_partitions: 2            # 2 partitions per date (each processes a subset of stocks)
+  max_concurrent_sessions: 10  # Max total sessions running concurrently
   
 replay:
-  heap_size_gb: 16.0           # More RAM for trading simulation
+  heap_size_gb: 16.0           # RAM allocated per session
   replay_speed: 100.0          # 100x speed for faster backtesting
   
 dates:
@@ -50,7 +50,9 @@ dates:
   weekdays_only: true          # 250 trading days
 ```
 
-This creates **10 workers per date × 250 days = 2,500 total replay sessions**.
+This creates **2 partitions per date × 250 days = 500 total replay sessions**.
+
+**Note**: For larger-scale backtesting, increase `num_partitions` (e.g., to 10 for 2,500 sessions) and adjust `max_concurrent_sessions` based on your server capacity.
 
 ### Environment Variables
 
@@ -64,12 +66,13 @@ Auto-generated:
 
 - `SIMULATION_NAME`: Unique identifier for the simulation run
 - `SIMULATION_DATE`: Date being simulated - also available via [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today)
-- `WORKER_ID`: Worker partition ID (0 to NUM_WORKERS-1) - this example uses it for stock partitioning
-- `NUM_WORKERS`: Total workers per date
+- `PARTITION_ID`: Partition ID (0 to NUM_PARTITIONS-1) - this example uses it for stock partitioning
+- `NUM_PARTITIONS`: Total partitions per date
 
 ## Prerequisites
 
 See the [main README](../README.md) for setup instructions. This example requires:
+
 - Deephaven Enterprise with FeedOS access for historical equity quote data
 
 ## Quick Start
@@ -79,17 +82,18 @@ See the [main README](../README.md) for setup instructions. This example require
 **2. Clean existing tables** - Run [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console and call `delete_all_tables()` to remove any previous simulation data.
 
 **3. Run** - From the `replay_orchestration` directory:
+
 ```bash
 replay-orchestrator --config trading_simulation/config.yaml
 ```
 
-This creates 2,500 sessions (10 workers × 250 trading days) and writes results to partitioned user tables in the `ExampleReplayTradingSim` namespace. Tables are auto-created on first write.
+This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleReplayTradingSim` namespace. Tables are auto-created on first write.
 
 ## Output Tables
 
 Results are written to partitioned user tables in the namespace specified by `OUTPUT_NAMESPACE` (default: `"ExampleReplayTradingSim"`):
 
-- **`TradingSimTrades`**: All executed trades with Date, Timestamp, Symbol, Price, Size, WorkerID
+- **`TradingSimTrades`**: All executed trades with Date, Timestamp, Symbol, Price, Size, PartitionID
 - **`TradingSimPositions`**: Current positions by symbol (cumulative shares held)
 - **`TradingSimPnl`**: Profit and loss calculations per symbol
 - **`TradingSimPreds`**: Price predictions with EMA-based buy/sell thresholds
@@ -97,34 +101,103 @@ Results are written to partitioned user tables in the namespace specified by `OU
 - **`TradingSimExecutions`**: Periodic snapshots with action codes
 - **`TradingSimSummary`**: Aggregated trade counts and total shares by symbol
 
-All tables include partition columns: `SimulationName`, `WorkerID`, `Date`
+All tables include partition columns: `SimulationName`, `PartitionID`, `Date`
 
-## Querying Results
+## Analysis Tools
 
-Use [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console to access results:
+Two utility scripts are provided for working with simulation results in the Deephaven IDE console:
+
+### [analyze_trading_results.py](analyze_trading_results.py)
+
+Comprehensive quantitative analysis of simulation performance with professional risk metrics.
+
+**Load the script:**
+
+In the Deephaven IDE console, open the script file and execute it directly (use the "Run" button or Ctrl/Cmd+Enter).
+
+**Quick start workflow:**
 
 ```python
-# List tables and row counts
+# Your simulation name from config.yaml
+sim_name = "trading_simulation"
+
+# Step 1: Get high-level overview
+summary = get_summary(sim_name)
+winners = summary["top_performers"]      # Top 5 stocks by P&L
+losers = summary["bottom_performers"]    # Bottom 5 stocks by P&L
+
+# Step 2: Analyze overall performance
+pnl = analyze_pnl(sim_name)
+overall = pnl["overall"]                 # Sharpe ratio, max drawdown, win rate
+equity_curve = pnl["by_date"]            # Cumulative P&L over time
+
+# Step 3: Investigate specific stocks
+aapl = analyze_by_symbol(sim_name, "AAPL")
+aapl_stats = aapl["stats"]               # Performance summary for AAPL
+```
+
+**Available functions:**
+
+- `get_summary(sim_name)` - Start here! Overview with best/worst performers
+- `analyze_pnl(sim_name)` - P&L metrics: Sharpe ratio, max drawdown, win rate
+- `analyze_trades(sim_name)` - Trade statistics, turnover, buy/sell breakdown
+- `analyze_by_symbol(sim_name, sym)` - Deep dive on a specific stock
+- `analyze_by_date(sim_name, date)` - Analyze a specific trading day
+- `analyze_positions(sim_name)` - Position sizing and distribution
+- `analyze_executions(sim_name)` - Trading signal patterns
+
+**Key metrics explained:**
+
+- **Sharpe Ratio**: Risk-adjusted return (>1 is good, >2 is excellent)
+- **Max Drawdown**: Worst peak-to-trough decline (more negative = worse)
+- **Win Rate**: Percentage of profitable days (0.5 = 50%)
+- **Turnover**: Total dollar value traded (for transaction cost estimation)
+
+All functions return dictionaries of Deephaven tables that automatically display in the UI when assigned to variables.
+
+### [manage_user_tables.py](manage_user_tables.py)
+
+Table management utilities for accessing and cleaning simulation data.
+
+**Load the script:**
+
+In the Deephaven IDE console, open the script file and execute it directly (use the "Run" button or Ctrl/Cmd+Enter).
+
+**Common operations:**
+
+```python
+# List all simulation tables with row counts
 list_tables()
 
-# Get tables for analysis
+# Get a table for querying
 trades = get_table("TradingSimTrades")
 pnl = get_table("TradingSimPnl")
 
 # Query the data
 trades.where("Sym = `AAPL`").tail(100)
 pnl.view(["Date", "Sym", "PnL"])
+
+# Delete specific table
+delete_table("TradingSimTrades")
+
+# Delete all simulation data (use before new runs)
+delete_all_tables()
 ```
 
-To delete all simulation data: `delete_all_tables()`
+**Available functions:**
+
+- `list_tables()` - Show all tables in namespace with row counts
+- `get_table(name)` - Retrieve a table for analysis
+- `delete_table(name)` - Delete a specific table
+- `delete_all_tables()` - Delete all simulation tables (prompts for confirmation)
 
 ## Expected Results
 
 After completion, you'll have:
 
 - Historical trades across a full year (250 trading days)
-- 2,500 total sessions (10 workers × 250 days)
-- Trades partitioned by date and worker
+- 500 total sessions (2 partitions × 250 days)
+- Trades partitioned by date and partition
 - Daily PnL by symbol
 - Position history
 - Strategy performance metrics
@@ -133,21 +206,24 @@ All data will be queryable in Deephaven for analysis and visualization.
 
 ## Key Features
 
-**Worker Partitioning**: Symbols are distributed across workers using hash-based partitioning:
+**Data Partitioning**: Symbols are distributed across partitions using hash-based partitioning:
+
 ```python
-my_symbols = all_symbols.where(f"Sym.hashCode() % {num_workers} == {worker_id}")
+my_symbols = all_symbols.where(f"Sym.hashCode() % {num_partitions} == {partition_id}")
 ```
 
 **Mean-Reversion Strategy**:
+
 - Uses EMA and standard deviation to predict price movements
 - Buys when ask < (predicted price - 1 SD)
 - Sells when bid > (predicted price + 1 SD)
 - Position limits prevent excessive exposure
 
 **Replay Data**: Uses FeedOS `EquityQuoteL1` table filtered for:
-- Current replay date via `today()`
+
+- Current replay date via `dh_today()`
 - Valid bid/ask quotes (size > 0)
-- Symbols assigned to this worker
+- Symbols assigned to this partition
 
 **Trade Execution**: Evaluates every 10 seconds via `snapshot_when()` and executes based on market conditions and position limits.
 
@@ -159,8 +235,8 @@ See [`examples/finance/simulated_market_maker`](../../finance/simulated_market_m
 
 To adapt for your use case:
 
-1. **Change stock universe**: Modify the `all_symbols` table in `trading_simulation.py`
-2. **Adjust strategy parameters**: Update `MAX_POSITION_DOLLARS`, `EMA_DECAY_TIME`, `LOT_SIZE` in `config.yaml`
-3. **Scale workers**: Increase `num_workers` to process more symbols in parallel
-4. **Adjust date range**: Modify `dates.start` and `dates.end` in `config.yaml`
+1. **Change stock universe**: Modify the `all_symbols` table in [`trading_simulation.py`](trading_simulation.py)
+2. **Adjust strategy parameters**: Update `MAX_POSITION_DOLLARS`, `EMA_DECAY_TIME`, `LOT_SIZE` in [`config.yaml`](config.yaml)
+3. **Scale partitions**: Increase `num_partitions` to process more symbols in parallel
+4. **Adjust date range**: Modify `dates.start` and `dates.end` in [`config.yaml`](config.yaml)
 5. **Speed up replay**: Increase `replay_speed` for faster backtesting (currently 100x)

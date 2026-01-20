@@ -5,25 +5,26 @@ from deephaven.time import dh_today
 
 simulation_name = os.getenv("SIMULATION_NAME")
 simulation_date = os.getenv("SIMULATION_DATE")
-worker_id = int(os.getenv("WORKER_ID", "0"))
-num_workers = int(os.getenv("NUM_WORKERS", "1"))
-output_table = os.getenv("OUTPUT_TABLE", "worker_results")
+partition_id = int(os.getenv("PARTITION_ID"))
+num_partitions = int(os.getenv("NUM_PARTITIONS"))
 log_level = os.getenv("LOG_LEVEL", "INFO")
+custom_message = os.getenv("CUSTOM_MESSAGE")
 
 print(f"[{log_level}] Simple Worker Started")
 print(f"[{log_level}] Simulation Name: {simulation_name}")
 print(f"[{log_level}] Simulation Date: {simulation_date}")
 print(f"[{log_level}] dh_today(): {dh_today()}")
-print(f"[{log_level}] Worker ID: {worker_id}")
-print(f"[{log_level}] Number of Workers: {num_workers}")
-print(f"[{log_level}] Output Table: {output_table}")
+print(f"[{log_level}] Partition ID: {partition_id}")
+print(f"[{log_level}] Number of Partitions: {num_partitions}")
+print(f"[{log_level}] Custom Message: {custom_message}")
 
 worker_status = new_table([
     string_col("Date", [simulation_date]),
-    int_col("WorkerID", [worker_id]),
-    int_col("NumWorkers", [num_workers]),
+    int_col("PartitionID", [partition_id]),
+    int_col("NumPartitions", [num_partitions]),
     string_col("Status", ["RUNNING"]),
-    string_col("Message", [f"Worker {worker_id} processing date {simulation_date}"])
+    string_col("Message", [f"Partition {partition_id} processing date {simulation_date}"]),
+    string_col("CustomMessage", [custom_message])
 ])
 
 print(f"[{log_level}] Simple Worker Completed Successfully")

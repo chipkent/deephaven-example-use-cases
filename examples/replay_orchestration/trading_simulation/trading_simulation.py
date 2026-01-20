@@ -16,8 +16,8 @@ Required Environment Variables:
     - SIMULATION_DATE: Date being simulated
     - QUERY_NAME: Full persistent query name
     - OUTPUT_NAMESPACE: Namespace for output user tables
-    - WORKER_ID: Worker partition ID (0 to NUM_WORKERS-1)
-    - NUM_WORKERS: Total number of workers
+    - PARTITION_ID: Partition ID (0 to NUM_PARTITIONS-1)
+    - NUM_PARTITIONS: Total number of partitions
     - MAX_POSITION_DOLLARS: Maximum position size in dollars
     - EMA_DECAY_TIME: EMA decay time window (ISO 8601 duration)
     - LOT_SIZE: Number of shares per trade
@@ -44,8 +44,8 @@ simulation_name = os.getenv("SIMULATION_NAME")
 simulation_date = os.getenv("SIMULATION_DATE")
 query_name = os.getenv("QUERY_NAME")
 output_namespace = os.getenv("OUTPUT_NAMESPACE")
-worker_id = int(os.getenv("WORKER_ID"))
-num_workers = int(os.getenv("NUM_WORKERS"))
+partition_id = int(os.getenv("PARTITION_ID"))
+num_partitions = int(os.getenv("NUM_PARTITIONS"))
 max_position_dollars = float(os.getenv("MAX_POSITION_DOLLARS"))
 ema_decay_time = os.getenv("EMA_DECAY_TIME")
 lot_size = int(os.getenv("LOT_SIZE"))
@@ -58,13 +58,13 @@ print(f"[INFO] Trading Simulation Worker Started")
 print(f"[INFO] Simulation Name: {simulation_name}")
 print(f"[INFO] Simulation Date: {simulation_date}")
 print(f"[INFO] dh_today(): {dh_today()}")
-print(f"[INFO] Worker ID: {worker_id}/{num_workers}")
+print(f"[INFO] Partition ID: {partition_id}/{num_partitions}")
 print(f"[INFO] Max Position: ${max_position_dollars}")
 print(f"[INFO] EMA Decay Time: {ema_decay_time}")
 print(f"[INFO] Lot Size: {lot_size}")
 
 ############################################################################################################
-# Define stock universe and partition by worker
+# Define stock universe and partition symbols across partitions
 ############################################################################################################
 
 all_symbols = new_table([
@@ -72,9 +72,9 @@ all_symbols = new_table([
     double_col("MaxPositionDollars", [max_position_dollars] * 10)
 ])
 
-my_symbols = all_symbols.where(f"Sym.hashCode() % {num_workers} == {worker_id}")
+my_symbols = all_symbols.where(f"Sym.hashCode() % {num_partitions} == {partition_id}")
 
-print(f"[INFO] This worker handles {my_symbols.size} symbols")
+print(f"[INFO] This partition handles {my_symbols.size} symbols")
 
 ############################################################################################################
 # Create simulated trade and position tables
@@ -86,7 +86,7 @@ trades_writer = DynamicTableWriter({
     "Sym": dht.string,
     "Price": dht.float64,
     "Size": dht.int64,
-    "WorkerID": dht.int32
+    "PartitionID": dht.int32
 })
 trades = trades_writer.table
 
@@ -96,8 +96,10 @@ positions = trades.view(["Sym", "Position=Size"]).sum_by("Sym")
 # Get replay market data
 ############################################################################################################
 
+trading_date = dh_today()
+
 ticks_bid_ask = db.live_table("FeedOS", "EquityQuoteL1") \
-    .where(["Date = today()", "BidSize > 0", "AskSize > 0"]) \
+    .where(["Date = trading_date", "BidSize > 0", "AskSize > 0"]) \
     .view(["Date", "Timestamp", "Sym = LocalCodeStr", "BidPrice=Bid", "BidSize", "AskPrice=Ask", "AskSize"]) \
     .where_in(my_symbols, "Sym")
 
@@ -185,21 +187,21 @@ def simulate_trade(date, timestamp, sym, bid, ask, pred_buy, pred_sell, is_buy_a
     if not trading_active:
         if position > 0:
             # Long position - sell at bid to close
-            trades_writer.write_row(date, timestamp, sym, bid, -position, worker_id)
+            trades_writer.write_row(date, timestamp, sym, bid, -position, partition_id)
             return "CLOSE_LONG"
         elif position < 0:
             # Short position - buy at ask to close
-            trades_writer.write_row(date, timestamp, sym, ask, -position, worker_id)
+            trades_writer.write_row(date, timestamp, sym, ask, -position, partition_id)
             return "CLOSE_SHORT"
         return "TRADING_OFF"
     
     # Normal trading period
     if is_buy_active and ask < pred_buy:
-        trades_writer.write_row(date, timestamp, sym, ask, lot_size, worker_id)
+        trades_writer.write_row(date, timestamp, sym, ask, lot_size, partition_id)
         return "BUY"
     
     if is_sell_active and bid > pred_sell:
-        trades_writer.write_row(date, timestamp, sym, bid, -lot_size, worker_id)
+        trades_writer.write_row(date, timestamp, sym, bid, -lot_size, partition_id)
         return "SELL"
     
     return "NO_TRADE"
@@ -229,7 +231,7 @@ def write_partitioned_tables():
     """
     partition_updates = [
         "SimulationName = simulation_name",
-        "WorkerID = worker_id",
+        "PartitionID = partition_id",
         "Date = simulation_date"
     ]
     
@@ -245,8 +247,8 @@ def write_partitioned_tables():
     
     print(f"[INFO] Writing user tables for simulation: {simulation_name}")
     
-    # Partition key: SimulationName/WorkerID/Date
-    partition_key = f"{simulation_name}/{worker_id}/{simulation_date}"
+    # Partition key: SimulationName/Date/PartitionID
+    partition_key = f"{simulation_name}/{simulation_date}/{partition_id}"
     
     for table, table_name in tables_to_write:
         try:
@@ -263,8 +265,8 @@ def write_partitioned_tables():
 ############################################################################################################
 
 print(f"[INFO] Trading simulation running for {my_symbols.size} symbols")
-print(f"[INFO] Worker {worker_id} will write results to partitioned tables")
-print(f"[INFO] Trading Simulation Worker Initialized Successfully")
+print(f"[INFO] Partition {partition_id} will write results to partitioned tables")
+print(f"[INFO] Trading Simulation Partition Initialized Successfully")
 
 ############################################################################################################
 # Monitor until market close and exit

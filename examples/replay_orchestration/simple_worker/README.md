@@ -19,13 +19,13 @@ The orchestrator automatically provides:
 
 - `SIMULATION_NAME`: Unique simulation identifier from config top-level `name` field
 - `SIMULATION_DATE`: The date being processed (YYYY-MM-DD) - also available via [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today)
-- `WORKER_ID`: The worker's ID (0 to NUM_WORKERS-1) for partitioning data
-- `NUM_WORKERS`: Total number of workers per date
+- `PARTITION_ID`: The partition ID (0 to NUM_PARTITIONS-1) for partitioning data
+- `NUM_PARTITIONS`: Total number of partitions per date
 
 From `config.yaml` env section:
 
-- `OUTPUT_TABLE`: Name of the output table
 - `LOG_LEVEL`: Logging level
+- `CUSTOM_MESSAGE`: Example custom parameter (demonstrates how to pass configuration to workers)
 
 ## Configuration
 
@@ -33,7 +33,7 @@ See `config.yaml` for the complete orchestrator configuration. Key settings:
 
 ```yaml
 execution:
-  num_workers: 2              # Creates 2 workers per date
+  num_partitions: 2           # Creates 2 partitions per date
   
 dates:
   start: "2024-01-01"
@@ -41,7 +41,7 @@ dates:
   weekdays_only: true         # Only Mon-Fri (5 weekdays in this range)
 ```
 
-This creates 2 workers per date × 5 weekdays = 10 total sessions.
+This creates 2 partitions per date × 5 weekdays = 10 total sessions.
 
 ## Running
 
@@ -55,17 +55,30 @@ replay-orchestrator --config simple_worker/config.yaml
 
 Each session prints to console:
 
-- All environment variables (SIMULATION_DATE, WORKER_ID, NUM_WORKERS, custom vars)
-- Comparison of SIMULATION_DATE vs `dh_today()` to verify replay date
+- `SIMULATION_NAME`: The simulation identifier
+- `SIMULATION_DATE`: The date being processed
+- `dh_today()`: Comparison to verify replay date matches
+- `PARTITION_ID`: This partition's ID
+- `NUM_PARTITIONS`: Total number of partitions per date
+- `CUSTOM_MESSAGE`: The custom message from config
 - Status messages confirming execution
 
-The script also creates an in-memory table (`worker_status`) to demonstrate basic Deephaven table creation, but **does not publish or persist it**. This is intentional - the example is purely for verification.
+The script also creates an in-memory table (`worker_status`) with the following columns:
+
+- `Date`: The simulation date
+- `PartitionID`: This partition's ID
+- `NumPartitions`: Total partitions per date
+- `Status`: Always "RUNNING" in this example
+- `Message`: Descriptive message showing partition and date
+- `CustomMessage`: The custom message from config
+
+This table is **not published or persisted** - it's purely for demonstration purposes.
 
 ## Verification
 
 After running, check the orchestrator console output to verify:
 
-- All 10 sessions (2 workers × 5 weekdays) were created
+- All 10 sessions (2 partitions × 5 weekdays) were created
 - Each session completed successfully
 - No failures reported
 - Exit code 0 (success)
