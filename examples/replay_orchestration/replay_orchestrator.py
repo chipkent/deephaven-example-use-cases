@@ -138,7 +138,15 @@ class ReplayOrchestrator:
         
         allowed_fields = {
             'deephaven': {'connection_url', 'auth_method', 'username', 'password', 'private_key_path'},
-            'execution': {'worker_script', 'num_workers', 'max_concurrent_sessions', 'max_retries', 'delete_successful_queries', 'delete_failed_queries'},
+            'execution': {
+                'worker_script',
+                'num_workers',
+                'max_concurrent_sessions',
+                'max_retries',
+                'max_failures',
+                'delete_successful_queries',
+                'delete_failed_queries',
+            },
             'replay': {
                 'heap_size_gb', 'init_timeout_minutes',
                 'replay_start', 'replay_speed', 'sorted_replay',
