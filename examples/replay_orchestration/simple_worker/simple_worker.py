@@ -36,5 +36,5 @@ from deephaven_enterprise.client.session_manager import SessionManager
 import time
 
 time.sleep(30)
-sm=SessionManager()
+sm = SessionManager()
 sm.controller_client.stop_and_wait(__PERSISTENT_QUERY_SERIAL_NUMBER)
