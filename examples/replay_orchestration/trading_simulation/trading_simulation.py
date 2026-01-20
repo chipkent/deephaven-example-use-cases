@@ -266,7 +266,7 @@ def write_partitioned_tables():
 
 print(f"[INFO] Trading simulation running for {my_symbols.size} symbols")
 print(f"[INFO] Partition {partition_id} will write results to partitioned tables")
-print(f"[INFO] Trading Simulation Worker Initialized Successfully")
+print(f"[INFO] Trading Simulation Partition Initialized Successfully")
 
 ############################################################################################################
 # Monitor until market close and exit
