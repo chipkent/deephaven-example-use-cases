@@ -207,6 +207,7 @@ execution:
 - `num_workers` (required): Number of parallel workers per date (range: 1-1000). Each worker receives a unique `WORKER_ID` (0 to num_workers-1)
 - `max_concurrent_sessions` (required): Maximum total replay sessions running simultaneously across all dates (range: 1-1000)
 - `max_retries` (optional, default: 3): Number of retry attempts for failed sessions
+- `max_failures` (optional, default: 10): Maximum execution failures before aborting. Orchestrator stops when this limit is reached to prevent cascading errors
 - `delete_successful_queries` (optional, default: true): If true, automatically delete successfully completed queries after orchestrator finishes. Set to false to keep successful queries for inspection
 - `delete_failed_queries` (optional, default: false): If true, automatically delete failed queries after orchestrator finishes. Set to true to clean up failed queries. By default, failed queries are preserved for debugging
 

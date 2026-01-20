@@ -105,34 +105,30 @@ class ReplayOrchestrator:
         self._validate_replay_config(config['replay'])
         self._validate_dates_config(config['dates'])
     
-    def _validate_config_structure(self, config: Dict):
-        """Validate top-level config structure, sections, and field presence."""
-        # Define all expected sections
+    def _validate_config_sections(self, config: Dict):
+        """Validate that config has expected sections and required sections."""
         expected_sections = {'name', 'deephaven', 'execution', 'replay', 'dates', 'env'}
         
-        # Check for unexpected sections
         actual_sections = set(config.keys())
         unexpected_sections = actual_sections - expected_sections
         if unexpected_sections:
             raise ValueError(f"Unexpected config sections: {', '.join(sorted(unexpected_sections))}")
         
-        # Check required top-level fields
         if 'name' not in config:
             raise ValueError("Missing required field: name")
         if not isinstance(config['name'], str) or not config['name'].strip():
             raise ValueError("name must be a non-empty string")
         
-        # Check required sections exist
         required_sections = ['deephaven', 'execution', 'replay', 'dates', 'env']
         for section in required_sections:
             if section not in config:
                 raise ValueError(f"Missing required config section: {section}")
         
-        # Validate env section type
         if not isinstance(config['env'], dict):
             raise ValueError("env section must be a dictionary")
-        
-        # Define required and optional fields for each section
+    
+    def _validate_section_fields(self, config: Dict):
+        """Validate that each section has required fields and no unexpected fields."""
         required_fields = {
             'deephaven': ['connection_url', 'auth_method', 'username'],
             'execution': ['worker_script', 'num_workers', 'max_concurrent_sessions'],
@@ -150,17 +146,14 @@ class ReplayOrchestrator:
                 'script_language', 'jvm_profile', 'server_name'
             },
             'dates': {'start', 'end', 'weekdays_only'},
-            'env': None  # env section can have arbitrary user-defined variables
+            'env': None
         }
         
-        # Validate each section has required fields and no unexpected fields
         for section, fields in required_fields.items():
-            # Check required fields exist
             for field in fields:
                 if field not in config[section]:
                     raise ValueError(f"Missing required field: {section}.{field}")
             
-            # Check for unexpected fields (except env which is user-defined)
             if allowed_fields[section] is not None:
                 actual_fields = set(config[section].keys())
                 unexpected_fields = actual_fields - allowed_fields[section]
@@ -169,6 +162,11 @@ class ReplayOrchestrator:
                         f"Unexpected fields in {section}: {', '.join(sorted(unexpected_fields))}. "
                         f"Allowed fields: {', '.join(sorted(allowed_fields[section]))}"
                     )
+    
+    def _validate_config_structure(self, config: Dict):
+        """Validate top-level config structure, sections, and field presence."""
+        self._validate_config_sections(config)
+        self._validate_section_fields(config)
     
     def _validate_deephaven_config(self, dh_config: Dict):
         """Validate Deephaven connection and authentication configuration."""
@@ -202,14 +200,12 @@ class ReplayOrchestrator:
             if not isinstance(private_key_path, str) or not private_key_path.strip():
                 raise ValueError("private_key_path must be a non-empty string")
     
-    def _validate_execution_config(self, exec_config: Dict):
-        """Validate execution configuration (workers, script, concurrency)."""
-        # Validate worker script path
+    def _validate_execution_numeric_fields(self, exec_config: Dict):
+        """Validate numeric fields in execution configuration."""
         worker_script = exec_config['worker_script']
         if not isinstance(worker_script, str) or not worker_script.strip():
             raise ValueError("worker_script must be a non-empty string")
         
-        # Validate num_workers (required)
         workers = exec_config['num_workers']
         if not isinstance(workers, int):
             raise ValueError(f"num_workers must be an integer (got {type(workers).__name__})")
@@ -218,7 +214,6 @@ class ReplayOrchestrator:
         if workers > 1000:
             raise ValueError(f"num_workers too high (got {workers}, max 1000)")
         
-        # Validate optional numeric fields
         if 'max_concurrent_sessions' in exec_config:
             concurrent = exec_config['max_concurrent_sessions']
             if not isinstance(concurrent, int):
@@ -234,8 +229,9 @@ class ReplayOrchestrator:
                 raise ValueError(f"max_retries must be an integer (got {type(retries).__name__})")
             if retries < 0:
                 raise ValueError(f"max_retries must be >= 0 (got {retries})")
-        
-        # Validate optional boolean fields
+    
+    def _validate_execution_boolean_fields(self, exec_config: Dict):
+        """Validate boolean fields in execution configuration."""
         if 'delete_successful_queries' in exec_config:
             delete_successful = exec_config['delete_successful_queries']
             if not isinstance(delete_successful, bool):
@@ -246,9 +242,13 @@ class ReplayOrchestrator:
             if not isinstance(delete_failed, bool):
                 raise ValueError(f"delete_failed_queries must be a boolean (got {type(delete_failed).__name__})")
     
-    def _validate_replay_config(self, replay_config: Dict):
-        """Validate replay configuration (heap, speed, replay settings)."""
-        # Validate heap_size_gb (required)
+    def _validate_execution_config(self, exec_config: Dict):
+        """Validate execution configuration (workers, script, concurrency)."""
+        self._validate_execution_numeric_fields(exec_config)
+        self._validate_execution_boolean_fields(exec_config)
+    
+    def _validate_replay_numeric_fields(self, replay_config: Dict):
+        """Validate numeric fields in replay configuration."""
         heap = replay_config['heap_size_gb']
         if not isinstance(heap, (int, float)):
             raise ValueError(f"heap_size_gb must be a number (got {type(heap).__name__})")
@@ -257,7 +257,6 @@ class ReplayOrchestrator:
         if heap > 512:
             raise ValueError(f"heap_size_gb too high (got {heap}, max 512)")
         
-        # Validate replay_speed (required)
         speed = replay_config['replay_speed']
         if not isinstance(speed, (int, float)):
             raise ValueError(f"replay_speed must be a number (got {type(speed).__name__})")
@@ -266,7 +265,6 @@ class ReplayOrchestrator:
         if speed > 100.0:
             raise ValueError(f"replay_speed too high (got {speed}, max 100).")
         
-        # Validate optional timeout
         if 'init_timeout_minutes' in replay_config:
             timeout = replay_config['init_timeout_minutes']
             if not isinstance(timeout, (int, float)):
@@ -274,68 +272,75 @@ class ReplayOrchestrator:
             if timeout <= 0:
                 raise ValueError(f"init_timeout_minutes must be > 0 (got {timeout})")
         
-        # Validate optional buffer_rows
         if 'buffer_rows' in replay_config:
             buffer = replay_config['buffer_rows']
             if not isinstance(buffer, int):
                 raise ValueError(f"buffer_rows must be an integer (got {type(buffer).__name__})")
             if buffer <= 0:
                 raise ValueError(f"buffer_rows must be > 0 (got {buffer})")
-        
-        # Validate replay_start format (HH:MM:SS, required)
+    
+    def _validate_replay_string_fields(self, replay_config: Dict):
+        """Validate string fields in replay configuration."""
         replay_start = replay_config['replay_start']
         if not isinstance(replay_start, str):
             raise ValueError(f"replay_start must be a string (got {type(replay_start).__name__})")
         if not re.match(r'^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)$', replay_start):
             raise ValueError(f"replay_start must be in HH:MM:SS format (got '{replay_start}')")
         
-        # Validate sorted_replay (optional boolean)
         if 'sorted_replay' in replay_config:
             sorted_replay = replay_config['sorted_replay']
             if not isinstance(sorted_replay, bool):
                 raise ValueError(f"sorted_replay must be a boolean (got {type(sorted_replay).__name__})")
         
-        # Validate script_language (required)
         lang = replay_config['script_language']
         if not isinstance(lang, str):
             raise ValueError(f"script_language must be a string (got {type(lang).__name__})")
         if lang not in ['Python', 'Groovy']:
             raise ValueError(f"script_language must be 'Python' or 'Groovy' (got '{lang}')")
         
-        # Validate optional jvm_profile
         if 'jvm_profile' in replay_config:
             jvm_profile = replay_config['jvm_profile']
             if not isinstance(jvm_profile, str) or not jvm_profile.strip():
                 raise ValueError("jvm_profile must be a non-empty string")
         
-        # Validate optional server_name
         if 'server_name' in replay_config:
             server_name = replay_config['server_name']
-            # Note: Valid server names are environment-specific, so we don't validate the exact value here
             if not isinstance(server_name, str) or not server_name.strip():
                 raise ValueError(f"server_name must be a non-empty string (got '{server_name}')")
+    
+    def _validate_replay_timestamp_columns(self, replay_config: Dict):
+        """Validate replay_timestamp_columns configuration."""
+        if 'replay_timestamp_columns' not in replay_config:
+            return
         
-        # Validate replay_timestamp_columns (optional list)
-        if 'replay_timestamp_columns' in replay_config:
-            ts_cols = replay_config['replay_timestamp_columns']
-            if not isinstance(ts_cols, list):
-                raise ValueError("replay_timestamp_columns must be a list")
-            for idx, ts_config in enumerate(ts_cols):
-                if not isinstance(ts_config, dict):
-                    raise ValueError(f"replay_timestamp_columns[{idx}] must be a dict")
-                required_keys = {'namespace', 'table', 'column'}
-                actual_keys = set(ts_config.keys())
-                missing_keys = required_keys - actual_keys
-                if missing_keys:
-                    raise ValueError(f"replay_timestamp_columns[{idx}] missing required keys: {', '.join(sorted(missing_keys))}")
-                unexpected_keys = actual_keys - required_keys
-                if unexpected_keys:
-                    raise ValueError(f"replay_timestamp_columns[{idx}] has unexpected keys: {', '.join(sorted(unexpected_keys))}")
-                # Validate that all values are non-empty strings
-                for key in required_keys:
-                    value = ts_config[key]
-                    if not isinstance(value, str) or not value.strip():
-                        raise ValueError(f"replay_timestamp_columns[{idx}].{key} must be a non-empty string (got {type(value).__name__})")
+        ts_cols = replay_config['replay_timestamp_columns']
+        if not isinstance(ts_cols, list):
+            raise ValueError("replay_timestamp_columns must be a list")
+        
+        for idx, ts_config in enumerate(ts_cols):
+            if not isinstance(ts_config, dict):
+                raise ValueError(f"replay_timestamp_columns[{idx}] must be a dict")
+            
+            required_keys = {'namespace', 'table', 'column'}
+            actual_keys = set(ts_config.keys())
+            missing_keys = required_keys - actual_keys
+            if missing_keys:
+                raise ValueError(f"replay_timestamp_columns[{idx}] missing required keys: {', '.join(sorted(missing_keys))}")
+            
+            unexpected_keys = actual_keys - required_keys
+            if unexpected_keys:
+                raise ValueError(f"replay_timestamp_columns[{idx}] has unexpected keys: {', '.join(sorted(unexpected_keys))}")
+            
+            for key in required_keys:
+                value = ts_config[key]
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(f"replay_timestamp_columns[{idx}].{key} must be a non-empty string (got {type(value).__name__})")
+    
+    def _validate_replay_config(self, replay_config: Dict):
+        """Validate replay configuration (heap, speed, replay settings)."""
+        self._validate_replay_numeric_fields(replay_config)
+        self._validate_replay_string_fields(replay_config)
+        self._validate_replay_timestamp_columns(replay_config)
     
     def _validate_dates_config(self, dates_config: Dict):
         """Validate dates configuration (start, end, weekdays_only)."""
@@ -528,12 +533,29 @@ class ReplayOrchestrator:
         
         logger.info("Authentication successful")
     
-    def _build_persistent_query_config(self, date: str, worker_id: int) -> PersistentQueryConfigMessage:
-        """Build PersistentQueryConfigMessage for a specific date and worker."""
-        # Create basic config message
-        config_msg = PersistentQueryConfigMessage()
-        
-        # Basic fields
+    def _load_worker_script_content(self):
+        """Load and cache worker script content."""
+        if self.worker_script_content is None:
+            worker_script_path = Path(self.config['execution']['worker_script'])
+            
+            if worker_script_path.is_absolute():
+                worker_script = worker_script_path.resolve()
+            else:
+                worker_script = (self.config_path.parent / worker_script_path).resolve()
+            
+            if not worker_script.exists():
+                raise FileNotFoundError(f"Worker script not found: {worker_script}")
+            if not worker_script.is_file():
+                raise ValueError(f"Worker script path is not a file: {worker_script}")
+            
+            with open(worker_script, 'r') as f:
+                self.worker_script_content = f.read()
+            logger.info(f"Loaded worker script: {worker_script} ({len(self.worker_script_content)} bytes)")
+        else:
+            logger.debug(f"Using cached worker script content ({len(self.worker_script_content)} bytes)")
+    
+    def _build_pq_basic_fields(self, config_msg: PersistentQueryConfigMessage, date: str, worker_id: int):
+        """Populate basic fields in PersistentQueryConfigMessage."""
         config_msg.serial = PQ_SERIAL_NEW
         config_msg.version = 1
         config_msg.configurationType = "ReplayScript"
@@ -549,37 +571,17 @@ class ReplayOrchestrator:
         config_msg.workerKind = "DeephavenCommunity"
         config_msg.restartUsers = DEFAULT_RESTART_USERS
         
-        # Initialization timeout (default: 60 seconds)
         init_timeout_minutes = self.config['replay'].get('init_timeout_minutes', 1)
         config_msg.timeoutNanos = int(init_timeout_minutes * 60 * 1_000_000_000)
         
-        # Load script content (cached)
-        if self.worker_script_content is None:
-            worker_script_path = Path(self.config['execution']['worker_script'])
-            
-            # Resolve worker script path (supports both absolute and relative paths)
-            if worker_script_path.is_absolute():
-                worker_script = worker_script_path.resolve()
-            else:
-                # Relative paths are resolved relative to config directory
-                worker_script = (self.config_path.parent / worker_script_path).resolve()
-            
-            if not worker_script.exists():
-                raise FileNotFoundError(f"Worker script not found: {worker_script}")
-            if not worker_script.is_file():
-                raise ValueError(f"Worker script path is not a file: {worker_script}")
-            
-            with open(worker_script, 'r') as f:
-                self.worker_script_content = f.read()
-            logger.info(f"Loaded worker script: {worker_script} ({len(self.worker_script_content)} bytes)")
-        else:
-            logger.debug(f"Using cached worker script content ({len(self.worker_script_content)} bytes)")
-        
         config_msg.scriptCode = self.worker_script_content
+    
+    def _build_pq_replay_fields(self, date: str) -> str:
+        """Build replay-specific fields as JSON string.
         
-        # Replay-specific fields (JSON) - must be wrapped in type/value structure
-        # Controller expects PascalCase which it maps to snake_case in ReplaySettings
-        # ReplaySorted uses boolean type, others use string type
+        Returns:
+            JSON string with type/value wrapped replay fields
+        """
         encoded_fields = {
             "ReplaySorted": {
                 "type": "boolean",
@@ -598,32 +600,43 @@ class ReplayOrchestrator:
                 "value": str(self.config['replay']['replay_speed'])
             }
         }
-        config_msg.typeSpecificFieldsJson = json.dumps(encoded_fields)
+        return json.dumps(encoded_fields)
+    
+    def _build_pq_environment_vars(self, date: str, worker_id: int, query_name: str) -> list:
+        """Build environment variables list in alternating name/value pairs.
         
-        # Environment variables - must be in alternating name/value pairs
+        Args:
+            date: Simulation date
+            worker_id: Worker ID
+            query_name: Query name for QUERY_NAME environment variable
+            
+        Returns:
+            List of alternating name/value strings
+        """
         env_vars = [
             "SIMULATION_NAME", self.config['name'],
             "SIMULATION_DATE", date,
             "WORKER_ID", str(worker_id),
             "NUM_WORKERS", str(self.config['execution']['num_workers']),
-            "QUERY_NAME", config_msg.name
+            "QUERY_NAME", query_name
         ]
         
         for key, value in self.config['env'].items():
             env_vars.extend([key, str(value)])
         
-        config_msg.extraEnvironmentVariables.extend(env_vars)
+        return env_vars
+    
+    def _build_pq_jvm_arguments(self) -> list:
+        """Build JVM arguments list.
         
-        # JVM arguments
+        Returns:
+            List of JVM argument strings
+        """
         jvm_args = []
         
         if 'buffer_rows' in self.config['replay']:
             jvm_args.append(f"-DReplayDatabase.BufferSize={self.config['replay']['buffer_rows']}")
         
-        # Automatically scale targetCycleDurationMillis to maintain simulated update frequency
-        # At 1x speed, cycles run at ~1000ms. At higher speeds, we scale proportionally to maintain
-        # the same simulated frequency. Formula: 1000ms / replay_speed
-        # Example: 60x speed → 16ms cycles maintains the same simulated update frequency as 1x
         replay_speed = self.config['replay'].get('replay_speed', 1.0)
         if replay_speed > 1.0:
             target_cycle_ms = int(1000 / replay_speed)
@@ -642,15 +655,36 @@ class ReplayOrchestrator:
                 column = ts_config['column']
                 jvm_args.append(f"-DReplayDatabase.TimestampColumn.{namespace}.{table}={column}")
         
-        config_msg.extraJvmArguments.extend(jvm_args)
+        return jvm_args
+    
+    def _build_pq_scheduling(self) -> list:
+        """Build scheduling configuration.
         
-        # Continuous scheduler - starts immediately and runs until worker stops it
-        # Temporary scheduler is incompatible with replay queries (cannot have stop time)
-        scheduling = GenerateScheduling.generate_continuous_scheduler(
+        Returns:
+            List of scheduling messages
+        """
+        return GenerateScheduling.generate_continuous_scheduler(
             start_time="00:00:00",
             time_zone="UTC",
             restart_daily=False
         )
+    
+    def _build_persistent_query_config(self, date: str, worker_id: int) -> PersistentQueryConfigMessage:
+        """Build PersistentQueryConfigMessage for a specific date and worker."""
+        config_msg = PersistentQueryConfigMessage()
+        
+        self._load_worker_script_content()
+        self._build_pq_basic_fields(config_msg, date, worker_id)
+        
+        config_msg.typeSpecificFieldsJson = self._build_pq_replay_fields(date)
+        
+        env_vars = self._build_pq_environment_vars(date, worker_id, config_msg.name)
+        config_msg.extraEnvironmentVariables.extend(env_vars)
+        
+        jvm_args = self._build_pq_jvm_arguments()
+        config_msg.extraJvmArguments.extend(jvm_args)
+        
+        scheduling = self._build_pq_scheduling()
         config_msg.scheduling.extend(scheduling)
         
         return config_msg
@@ -711,29 +745,37 @@ class ReplayOrchestrator:
         return tasks
     
     def _get_running_session_count(self, pq_info_map: Dict[int, Any], active_sessions: Set[Tuple[str, int]]) -> int:
-        """Count currently running sessions managed by this orchestrator.
+        """Count currently active (non-terminal) sessions managed by this orchestrator.
         
         Args:
             pq_info_map: Map of serial -> PQ info from controller
             active_sessions: Set of (date, worker_id) tuples currently active
             
         Returns:
-            Count of running sessions
+            Count of active (non-terminal) sessions including initializing, acquiring workers, and running
         """
         if self.dry_run:
             return len(active_sessions)
         
-        running_count = 0
-        # Only check active sessions, not all sessions
+        active_count = 0
+        # Count all non-terminal sessions to properly enforce concurrency limit
         for session_key in active_sessions:
             serial = self.sessions.get(session_key)
-            if serial and serial in pq_info_map:
+            if serial is None:
+                # Should not happen due to ordering in _launch_pending_sessions
+                continue
+            
+            if serial in pq_info_map:
                 pq_info = pq_info_map[serial]
-                if self.session_mgr.controller_client.is_running(pq_info.state.status):
-                    running_count += 1
+                # Only skip if we know it's terminal
+                if not self.session_mgr.controller_client.is_terminal(pq_info.state.status):
+                    active_count += 1
+            else:
+                # Session not in map yet (newly created), assume it's active
+                active_count += 1
         
-        logger.debug(f"Running sessions: {running_count}, Active: {len(active_sessions)}")
-        return running_count
+        logger.debug(f"Active (non-terminal) sessions: {active_count}, Tracked active: {len(active_sessions)}")
+        return active_count
     
     def _check_session_status(self, session_key: Tuple[str, int], pq_info_map: Dict[int, Any]) -> Optional[str]:
         """Check status of a session.
@@ -743,10 +785,11 @@ class ReplayOrchestrator:
             pq_info_map: Map of serial -> PQ info from controller
             
         Returns:
-            'completed', 'failed', 'active', or None if not found
+            'completed', 'failed', 'resource_unavailable', 'active', or None if not found
             
         Notes:
             'active' covers all non-terminal states (initializing, acquiring worker, running, etc.)
+            'resource_unavailable' indicates autoscaler has no available capacity (transient, retriable)
         """
         if self.dry_run:
             # In dry run, simulate completion
@@ -767,6 +810,30 @@ class ReplayOrchestrator:
             if status_name in ('PQS_COMPLETED', 'PQS_STOPPED'):
                 return 'completed'
             else:
+                # Check if this is a resource unavailability failure
+                date, worker_id = session_key
+                exception_details = pq_info.state.exceptionDetails
+                exception_str = str(exception_details) if exception_details else ''
+                
+                # DEBUG: Log exception details and pattern matching
+                logger.warning(f"[DEBUG] Session failed: date={date}, worker={worker_id}, status={status_name}")
+                logger.warning(f"[DEBUG] Exception (first 1000 chars): {exception_str[:1000]}")
+                
+                has_resources_unavailable = 'ResourcesUnavailableException' in exception_str
+                has_unable_to_find = 'Unable to find available server' in exception_str
+                has_unable_to_determine = 'Unable to determine dispatcher' in exception_str
+                has_no_dispatcher_resources = 'No dispatcher resources available' in exception_str
+                
+                logger.warning(f"[DEBUG] Pattern checks: ResourcesUnavailableException={has_resources_unavailable}, "
+                              f"Unable to find available server={has_unable_to_find}, "
+                              f"Unable to determine dispatcher={has_unable_to_determine}, "
+                              f"No dispatcher resources available={has_no_dispatcher_resources}")
+                
+                if exception_str and (has_resources_unavailable or has_unable_to_find or has_unable_to_determine or has_no_dispatcher_resources):
+                    logger.warning(f"[DEBUG] CLASSIFYING AS RESOURCE_UNAVAILABLE")
+                    return 'resource_unavailable'
+                
+                logger.warning(f"[DEBUG] CLASSIFYING AS FAILED")
                 return 'failed'
         else:
             # All non-terminal states: keep monitoring
@@ -786,9 +853,30 @@ class ReplayOrchestrator:
         logger.info(f"Max concurrent sessions: {max_concurrent}")
         logger.info(f"Max retries: {max_retries}")
     
+    def _handle_session_creation_failure(self, session_key: Tuple[str, int], max_retries: int, 
+                                         pending_tasks: Deque[Tuple[str, int]]):
+        """Handle session creation failure with retry logic.
+        
+        Args:
+            session_key: Tuple of (date, worker_id)
+            max_retries: Maximum retry attempts
+            pending_tasks: Deque to add retry tasks to (modified in place)
+        """
+        date, worker_id = session_key
+        retry_count = self.retry_counts.get(session_key, 0)
+        
+        if retry_count < max_retries:
+            self.retry_counts[session_key] = retry_count + 1
+            pending_tasks.appendleft((date, worker_id))
+            logger.warning(f"Retrying session: date={date}, worker={worker_id} (attempt {retry_count + 1}/{max_retries})")
+            time.sleep(DEFAULT_RETRY_DELAY_SECONDS)
+        else:
+            self.retry_counts.pop(session_key, None)
+            logger.error(f"Failed to create session after {max_retries} retries: date={date}, worker={worker_id}")
+    
     def _launch_pending_sessions(self, pending_tasks: Deque[Tuple[str, int]], active_sessions: Set[Tuple[str, int]], 
                                  max_concurrent: int, max_retries: int, total_tasks: int, 
-                                 pq_info_map: Dict[int, Any]) -> Tuple[int, bool]:
+                                 pq_info_map: Dict[int, Any]) -> int:
         """Launch sessions up to capacity.
         
         Args:
@@ -800,10 +888,9 @@ class ReplayOrchestrator:
             pq_info_map: Current PQ info map from controller
             
         Returns:
-            Tuple of (created_count: int, map_needs_refresh: bool)
+            Number of sessions created this call
         """
         created_count = 0
-        map_needs_refresh = False
         
         while True:
             running_count = self._get_running_session_count(pq_info_map, active_sessions)
@@ -823,39 +910,80 @@ class ReplayOrchestrator:
             success, serial = self._create_session(date, worker_id)
             
             if success:
-                active_sessions.add(session_key)
                 self.sessions[session_key] = serial
+                active_sessions.add(session_key)
                 created_count += 1
-                map_needs_refresh = True  # Map is stale after creation
-                
-                # Clean up retry tracking for successful creation
                 self.retry_counts.pop(session_key, None)
-                
                 logger.info(f"Created session {len(self.sessions)}/{total_tasks}: date={date}, worker={worker_id}, serial={serial}")
             else:
-                # Handle creation failure
-                retry_count = self.retry_counts.get(session_key, 0)
-                
-                if retry_count < max_retries:
-                    self.retry_counts[session_key] = retry_count + 1
-                    # Use appendleft for immediate retry on next iteration
-                    pending_tasks.appendleft((date, worker_id))
-                    logger.warning(f"Retrying session: date={date}, worker={worker_id} (attempt {retry_count + 1}/{max_retries})")
-                    time.sleep(DEFAULT_RETRY_DELAY_SECONDS)
-                else:
-                    self.failed_sessions.append(session_key)
-                    # Clean up retry tracking after final failure
-                    self.retry_counts.pop(session_key, None)
-                    logger.error(f"Failed to create session after {max_retries} retries: date={date}, worker={worker_id}")
+                self._handle_session_creation_failure(session_key, max_retries, pending_tasks)
         
-        return created_count, map_needs_refresh
+        return created_count
     
-    def _process_active_sessions(self, active_sessions: Set[Tuple[str, int]], pq_info_map: Dict[int, Any]) -> Tuple[int, int]:
+    def _handle_resource_unavailability(self, session_key: Tuple[str, int], pending_tasks: Deque[Tuple[str, int]]):
+        """Handle resource unavailability by deleting PQ and re-queueing task.
+        
+        Args:
+            session_key: Tuple of (date, worker_id)
+            pending_tasks: Deque to add retry task to (modified in place)
+        """
+        date, worker_id = session_key
+        serial = self.sessions.get(session_key)
+        
+        logger.warning(
+            f"Resource unavailable for session: date={date}, worker={worker_id}, serial={serial}. "
+            f"Autoscaler has no available capacity. Deleting PQ and re-queueing for retry."
+        )
+        
+        # Delete the failed PQ immediately
+        if serial is not None:
+            try:
+                self.session_mgr.controller_client.delete_query(serial)
+                logger.info(f"Deleted PQ serial {serial} due to resource unavailability")
+            except Exception as e:
+                logger.error(f"Failed to delete PQ serial {serial}: {e}")
+        
+        # Remove from tracking
+        self.sessions.pop(session_key, None)
+        
+        # Re-queue at front of pending tasks for immediate retry when capacity available
+        pending_tasks.appendleft((date, worker_id))
+        
+        # Wait before continuing to allow autoscaler time to provision
+        time.sleep(5)
+    
+    def _log_session_failure(self, session_key: Tuple[str, int], pq_info_map: Dict[int, Any]):
+        """Log detailed failure information for a session.
+        
+        Args:
+            session_key: Tuple of (date, worker_id)
+            pq_info_map: Current PQ info map from controller
+        """
+        date, worker_id = session_key
+        serial = self.sessions.get(session_key)
+        
+        if serial and serial in pq_info_map:
+            status_name = self.session_mgr.controller_client.status_name(pq_info_map[serial].state.status)
+            logger.error(
+                f"Session failed: date={date}, worker={worker_id}, serial={serial}, status={status_name}. "
+                f"Check persistent query logs for serial {serial} for details. "
+                f"Session left in Deephaven for inspection. "
+                f"Common causes: script errors, insufficient heap memory, missing data."
+            )
+        else:
+            logger.error(
+                f"Session failed: date={date}, worker={worker_id}. "
+                f"Session info not available in PQ map."
+            )
+    
+    def _process_active_sessions(self, active_sessions: Set[Tuple[str, int]], pq_info_map: Dict[int, Any], 
+                                 pending_tasks: Deque[Tuple[str, int]]) -> Tuple[int, int]:
         """Process active sessions, checking for completion or failure.
         
         Args:
             active_sessions: Set of currently active (date, worker_id) tuples (modified in place)
             pq_info_map: Current PQ info map from controller
+            pending_tasks: Deque to add resource-unavailable retries to (modified in place)
             
         Returns:
             Tuple of (completed_count: int, failed_count: int)
@@ -863,6 +991,8 @@ class ReplayOrchestrator:
         Side effects:
             - Removes completed/failed sessions from active_sessions
             - Appends failed sessions to self.failed_sessions
+            - Failed sessions are left in Deephaven for inspection (not deleted)
+            - Resource-unavailable sessions are deleted and re-queued (not counted as failures)
         """
         completed_count = 0
         failed_count = 0
@@ -874,25 +1004,16 @@ class ReplayOrchestrator:
             if status == 'completed':
                 active_sessions.remove(session_key)
                 completed_count += 1
+                self.retry_counts.pop(session_key, None)
                 logger.info(f"Session completed successfully: date={date}, worker={worker_id}")
+            elif status == 'resource_unavailable':
+                active_sessions.remove(session_key)
+                self._handle_resource_unavailability(session_key, pending_tasks)
             elif status == 'failed':
                 active_sessions.remove(session_key)
                 failed_count += 1
                 self.failed_sessions.append(session_key)
-                serial = self.sessions.get(session_key)
-                if serial and serial in pq_info_map:
-                    status_name = self.session_mgr.controller_client.status_name(pq_info_map[serial].state.status)
-                    logger.error(
-                        f"Session failed: date={date}, worker={worker_id}, serial={serial}, status={status_name}. "
-                        f"Check persistent query logs for serial {serial} for details. "
-                        f"Common causes: script errors, insufficient heap memory, missing data."
-                    )
-                else:
-                    logger.error(
-                        f"Session failed: date={date}, worker={worker_id}. "
-                        f"Session info not available in PQ map."
-                    )
-            # 'active' status: leave session in active_sessions and continue monitoring
+                self._log_session_failure(session_key, pq_info_map)
         
         return completed_count, failed_count
     
@@ -996,114 +1117,115 @@ class ReplayOrchestrator:
             for date, worker_id in self.failed_sessions:
                 logger.error(f"  - date={date}, worker={worker_id}")
     
-    def run(self) -> int:
-        """Execute the orchestrator.
+    def _setup_orchestration(self) -> Tuple[list, int, int, int, int]:
+        """Setup orchestration: header, auth, tasks, and config.
         
         Returns:
-            Exit code: EXIT_SUCCESS, EXIT_CREATION_FAILURES, EXIT_EXECUTION_FAILURES, 
-                      EXIT_BOTH_FAILURES, or EXIT_ERROR
+            Tuple of (tasks, total_tasks, max_concurrent, max_retries, max_failures)
         """
         self._print_header()
         
         if self.dry_run:
             logger.info("[DRY RUN MODE] - No sessions will be created")
         
-        # Authenticate
         self._authenticate()
         
-        # Generate tasks
         tasks = self._generate_session_tasks()
         total_tasks = len(tasks)
         
-        # Configuration
         max_concurrent = self.config['execution']['max_concurrent_sessions']
         max_retries = self.config['execution'].get('max_retries', DEFAULT_MAX_RETRIES)
+        max_failures = self.config['execution'].get('max_failures', 10)
         self._print_config_summary(total_tasks, max_concurrent, max_retries)
         
-        if self.dry_run:
-            logger.info("[DRY RUN] Validation complete. Exiting.")
-            return EXIT_SUCCESS
+        return tasks, total_tasks, max_concurrent, max_retries, max_failures
+    
+    def _update_progress_tracking(self, created: int, completed: int, failed: int, 
+                                 active_sessions: Set[Tuple[str, int]], pending_tasks: Deque[Tuple[str, int]],
+                                 idle_iterations: int, last_progress_count: int, startup_phase: bool) -> Tuple[int, int, bool]:
+        """Update progress tracking and detect stalls.
         
-        # Execute sessions
-        created, completed, failed = 0, 0, 0
-        active_sessions: Set[Tuple[str, int]] = set()
-        pending_tasks: Deque[Tuple[str, int]] = deque(tasks)
+        Args:
+            created: Number of sessions created so far
+            completed: Number of sessions completed so far
+            failed: Number of sessions failed so far
+            active_sessions: Set of currently active sessions
+            pending_tasks: Deque of pending tasks
+            idle_iterations: Current idle iteration count
+            last_progress_count: Last recorded progress count
+            startup_phase: Whether still in startup phase
+            
+        Returns:
+            Tuple of (idle_iterations, last_progress_count, startup_phase)
+        """
+        if startup_phase and (completed > 0 or failed > 0):
+            startup_phase = False
+            logger.debug("Exiting startup phase, sessions are progressing")
         
-        # Get initial PQ info map
-        pq_info_map, map_version = self.session_mgr.controller_client.map_and_version()
-        
-        # Progress tracking
-        idle_iterations = 0
-        last_progress_count = 0
-        startup_phase = True  # Use higher threshold during startup when queries are initializing
-        
-        while (pending_tasks or active_sessions) and not self.shutdown_requested:
-            # Launch new sessions up to capacity
-            created_delta, map_needs_refresh = self._launch_pending_sessions(
-                pending_tasks, active_sessions, max_concurrent, max_retries, total_tasks, pq_info_map
-            )
-            created += created_delta
-            
-            # Refresh map if we created sessions
-            if map_needs_refresh:
-                old_version = map_version
-                pq_info_map, map_version = self.session_mgr.controller_client.map_and_version()
-                logger.debug(f"Refreshed PQ info map (version: {old_version} → {map_version})")
-            
-            # Check for completed/failed sessions
-            completed_delta, failed_delta = self._process_active_sessions(active_sessions, pq_info_map)
-            completed += completed_delta
-            failed += failed_delta
-            
-            # Exit startup phase once first session completes or fails
-            if startup_phase and (completed > 0 or failed > 0):
-                startup_phase = False
-                logger.debug("Exiting startup phase, sessions are progressing")
-            
-            # Track progress to detect stalls
-            current_progress = created + completed + failed
-            if current_progress == last_progress_count:
-                idle_iterations += 1
-                # Use higher threshold during startup when queries are initializing
-                threshold = MAX_IDLE_ITERATIONS_STARTUP if startup_phase else MAX_IDLE_ITERATIONS
-                if idle_iterations >= threshold:
-                    if startup_phase:
-                        logger.warning(
-                            f"Sessions initializing ({threshold} iterations without progress). "
-                            f"Created: {created}, Active: {len(active_sessions)}, Pending: {len(pending_tasks)}. "
-                            f"This is normal during startup as queries initialize and acquire workers."
-                        )
-                    else:
-                        logger.warning(
-                            f"No progress for {threshold} iterations. "
-                            f"Created: {created}, Active: {len(active_sessions)}, Pending: {len(pending_tasks)}, "
-                            f"Completed: {completed}, Failed: {failed}. "
-                            f"If stuck, check server logs and query status in the UI."
-                        )
-                    idle_iterations = 0  # Reset after warning
-            else:
+        current_progress = created + completed + failed
+        if current_progress == last_progress_count:
+            idle_iterations += 1
+            threshold = MAX_IDLE_ITERATIONS_STARTUP if startup_phase else MAX_IDLE_ITERATIONS
+            if idle_iterations >= threshold:
+                if startup_phase:
+                    logger.warning(
+                        f"Sessions initializing ({threshold} iterations without progress). "
+                        f"Created: {created}, Active: {len(active_sessions)}, Pending: {len(pending_tasks)}. "
+                        f"This is normal during startup as queries initialize and acquire workers."
+                    )
+                else:
+                    logger.warning(
+                        f"No progress for {threshold} iterations. "
+                        f"Created: {created}, Active: {len(active_sessions)}, Pending: {len(pending_tasks)}, "
+                        f"Completed: {completed}, Failed: {failed}. "
+                        f"If stuck, check server logs and query status in the UI."
+                    )
                 idle_iterations = 0
-                last_progress_count = current_progress
-            
-            # Wait for status changes if we have work remaining
-            if active_sessions or pending_tasks:
-                pq_info_map, map_version = self._wait_for_status_change(map_version)
+        else:
+            idle_iterations = 0
+            last_progress_count = current_progress
         
-        # Handle shutdown
+        return idle_iterations, last_progress_count, startup_phase
+    
+    def _handle_orchestration_shutdown(self, active_sessions: Set[Tuple[str, int]], pending_tasks: Deque[Tuple[str, int]]):
+        """Handle orchestration shutdown.
+        
+        Args:
+            active_sessions: Set of currently active sessions
+            pending_tasks: Deque of pending tasks
+        """
         if self.shutdown_requested:
             logger.warning(f"Orchestrator stopped by user. Active sessions: {len(active_sessions)}, Pending: {len(pending_tasks)}")
             self._cleanup_sessions()
+    
+    def _cleanup_and_report(self, total_tasks: int, created: int, completed: int, failed: int):
+        """Delete queries based on config and print summary.
         
-        # Delete queries based on configuration (before summary so deletion is included)
+        Args:
+            total_tasks: Total number of tasks
+            created: Number of sessions created
+            completed: Number of sessions completed
+            failed: Number of sessions failed
+        """
         delete_successful = self.config['execution'].get('delete_successful_queries', True)
         delete_failed = self.config['execution'].get('delete_failed_queries', False)
         if not self.dry_run:
             self._delete_queries(delete_successful, delete_failed)
         
-        # Print summary
         self._print_summary(total_tasks, created, completed, failed)
+    
+    def _determine_exit_code(self, total_tasks: int, created: int, failed: int) -> int:
+        """Determine exit code based on execution results.
         
-        # Determine exit code
+        Args:
+            total_tasks: Total number of tasks
+            created: Number of sessions created
+            failed: Number of sessions failed
+            
+        Returns:
+            Exit code: EXIT_SUCCESS, EXIT_CREATION_FAILURES, EXIT_EXECUTION_FAILURES, 
+                      EXIT_BOTH_FAILURES, or EXIT_ERROR
+        """
         creation_failures = total_tasks - created
         execution_failures = failed
         
@@ -1115,6 +1237,66 @@ class ReplayOrchestrator:
             return EXIT_CREATION_FAILURES
         else:
             return EXIT_SUCCESS
+    
+    def run(self) -> int:
+        """Execute the orchestrator.
+        
+        Returns:
+            Exit code: EXIT_SUCCESS, EXIT_CREATION_FAILURES, EXIT_EXECUTION_FAILURES, 
+                      EXIT_BOTH_FAILURES, or EXIT_ERROR
+        """
+        tasks, total_tasks, max_concurrent, max_retries, max_failures = self._setup_orchestration()
+        
+        if self.dry_run:
+            logger.info("[DRY RUN] Validation complete. Exiting.")
+            return EXIT_SUCCESS
+
+        created, completed, failed = 0, 0, 0
+        active_sessions: Set[Tuple[str, int]] = set()
+        pending_tasks: Deque[Tuple[str, int]] = deque(tasks)
+        
+        pq_info_map, map_version = self.session_mgr.controller_client.map_and_version()
+        
+        idle_iterations = 0
+        last_progress_count = 0
+        startup_phase = True
+        
+        while (pending_tasks or active_sessions) and not self.shutdown_requested:
+            old_version = map_version
+            pq_info_map, map_version = self.session_mgr.controller_client.map_and_version()
+            logger.debug(f"Refreshed PQ info map at loop start (version: {old_version} → {map_version})")
+            
+            created_delta = self._launch_pending_sessions(
+                pending_tasks, active_sessions, max_concurrent, max_retries, total_tasks, pq_info_map
+            )
+            created += created_delta
+            
+            completed_delta, failed_delta = self._process_active_sessions(active_sessions, pq_info_map, pending_tasks)
+            completed += completed_delta
+            failed += failed_delta
+            
+            total_failures = len(self.failed_sessions)
+            if total_failures >= max_failures:
+                logger.error(
+                    f"Maximum failure limit reached ({total_failures}/{max_failures}). "
+                    f"Aborting orchestration to prevent cascading errors. "
+                    f"Check persistent query logs and configuration. "
+                    f"Pending tasks: {len(pending_tasks)}, Active sessions: {len(active_sessions)}"
+                )
+                break
+            
+            idle_iterations, last_progress_count, startup_phase = self._update_progress_tracking(
+                created, completed, failed, active_sessions, pending_tasks,
+                idle_iterations, last_progress_count, startup_phase
+            )
+            
+            if active_sessions or pending_tasks:
+                time.sleep(1.0)
+        
+        self._handle_orchestration_shutdown(active_sessions, pending_tasks)
+        self._cleanup_and_report(total_tasks, created, completed, failed)
+        
+        return self._determine_exit_code(total_tasks, created, failed)
 
 
 def main():

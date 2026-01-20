@@ -39,7 +39,6 @@ from deephaven.column import string_col, double_col
 import deephaven.dtypes as dht
 from deephaven.updateby import ema_time, emstd_time, cum_min
 from deephaven.time import dh_today, dh_now, to_j_instant
-from deephaven_enterprise import db
 
 simulation_name = os.getenv("SIMULATION_NAME")
 simulation_date = os.getenv("SIMULATION_DATE")
@@ -73,10 +72,9 @@ all_symbols = new_table([
     double_col("MaxPositionDollars", [max_position_dollars] * 10)
 ])
 
-my_symbols = all_symbols.where(f"(int)(hashCode(Sym)) % {num_workers} == {worker_id}")
-symbol_list = [row["Sym"] for row in my_symbols.to_dict()["Sym"]]
+my_symbols = all_symbols.where(f"Sym.hashCode() % {num_workers} == {worker_id}")
 
-print(f"[INFO] This worker handles {len(symbol_list)} symbols: {', '.join(symbol_list)}")
+print(f"[INFO] This worker handles {my_symbols.size} symbols")
 
 ############################################################################################################
 # Create simulated trade and position tables
@@ -99,8 +97,8 @@ positions = trades.view(["Sym", "Position=Size"]).sum_by("Sym")
 ############################################################################################################
 
 ticks_bid_ask = db.live_table("FeedOS", "EquityQuoteL1") \
-    .view(["Date", "Timestamp", "Sym = LocalCodeStr", "BidPrice=Bid", "BidSize", "AskPrice=Ask", "AskSize"]) \
     .where(["Date = today()", "BidSize > 0", "AskSize > 0"]) \
+    .view(["Date", "Timestamp", "Sym = LocalCodeStr", "BidPrice=Bid", "BidSize", "AskPrice=Ask", "AskSize"]) \
     .where_in(my_symbols, "Sym")
 
 ############################################################################################################
@@ -264,7 +262,7 @@ def write_partitioned_tables():
 # Initialization complete
 ############################################################################################################
 
-print(f"[INFO] Trading simulation running for {len(symbol_list)} symbols")
+print(f"[INFO] Trading simulation running for {my_symbols.size} symbols")
 print(f"[INFO] Worker {worker_id} will write results to partitioned tables")
 print(f"[INFO] Trading Simulation Worker Initialized Successfully")
 

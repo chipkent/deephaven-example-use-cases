@@ -12,15 +12,15 @@ execution:
   max_concurrent_sessions: 20
   
 replay:
-  heap_size_gb: 8.0
+  heap_size_gb: 16.0
   init_timeout_minutes: 30
   script_language: "Python"
   replay_start: "09:30:00"
   replay_speed: 100.0
-  # replay_timestamp_columns:  # Optional: specify timestamp column per table
-  #   - namespace: "Market"
-  #     table: "Trade"
-  #     column: "EventTime"
+  replay_timestamp_columns:
+    - namespace: "FeedOS"
+      table: "EquityQuoteL1"
+      column: "Timestamp"
 
 dates:
   start: "2024-01-01"

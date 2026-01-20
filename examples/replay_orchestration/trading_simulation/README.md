@@ -38,7 +38,7 @@ This example is configured for large-scale backtesting:
 ```yaml
 execution:
   num_workers: 10              # 10 workers per date (each processes a subset of stocks)
-  max_concurrent_sessions: 50  # Max total sessions running concurrently
+  max_concurrent_sessions: 20  # Max total sessions running concurrently
   
 replay:
   heap_size_gb: 8.0            # More RAM for trading simulation

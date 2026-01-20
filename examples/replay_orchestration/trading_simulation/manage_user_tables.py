@@ -13,8 +13,6 @@ Note: Modern Deephaven versions may auto-create tables on first write,
 making create_empty_tables() unnecessary.
 """
 
-from deephaven_enterprise import db
-
 # Default namespace for output tables
 DEFAULT_NAMESPACE = "ExampleReplayTradingSim"
 
