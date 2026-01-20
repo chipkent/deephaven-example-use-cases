@@ -1,0 +1,28 @@
+name: "simple_worker_example"
+
+deephaven:
+  connection_url: "${DH_CONNECTION_URL}"
+  auth_method: "password"
+  username: "${DH_USERNAME}"
+  password: "${DH_PASSWORD}"
+  
+execution:
+  worker_script: "simple_worker.py"
+  num_workers: 2
+  max_concurrent_sessions: 10
+  
+replay:
+  heap_size_gb: 4.0
+  init_timeout_minutes: 10
+  script_language: "Python"
+  replay_start: "09:30:00"
+  replay_speed: 100.0
+
+dates:
+  start: "2024-01-01"
+  end: "2024-01-05"
+  weekdays_only: true
+  
+env:
+  OUTPUT_TABLE: "simple_results"
+  LOG_LEVEL: "INFO"
