@@ -1,17 +1,17 @@
 # Replay Orchestration Framework
 
-A generic framework for orchestrating Deephaven Enterprise replay persistent queries across multiple dates with parallel workers per date.
+A generic framework for orchestrating Deephaven Enterprise replay persistent queries across multiple dates with parallel partitions per date.
 
 **What are replay persistent queries?** They allow you to run Deephaven queries against historical data as if it were live, making it possible to backtest strategies or reprocess data while maintaining the same code you'd use in production. See [Deephaven Replay Documentation](https://deephaven.io/enterprise/docs/deephaven-database/replayer/) for details.
 
-**Why multiple workers per date?** Large datasets (e.g., thousands of stocks) can be partitioned across workers to process in parallel, dramatically reducing backtest time. For example, 10 workers can each process 1/10th of your stock universe simultaneously.
+**Why multiple partitions per date?** Large datasets (e.g., thousands of stocks) can be divided across partitions to process in parallel, dramatically reducing backtest time. For example, 10 partitions can each process 1/10th of your stock universe simultaneously.
 
 ## Overview
 
 The replay orchestrator creates and manages replay persistent queries based on a configuration file. It:
 
 - **Parallelizes across dates**: Run simulations for multiple dates concurrently
-- **Partitions data within each date**: Split data processing across multiple workers per date
+- **Partitions data within each date**: Split data processing across multiple partitions per date
 - **Handles retries**: Automatically retries failed sessions
 - **Flexible configuration**: Each example has its own complete configuration
 - **Generic design**: Works with any worker script
@@ -23,14 +23,14 @@ The replay orchestrator creates and manages replay persistent queries based on a
 │                  Orchestrator                            │
 │  - Reads config.yaml                                     │
 │  - Authenticates with Deephaven Enterprise               │
-│  - Creates (dates × workers_per_date) replay queries     │
+│  - Creates (dates × partitions_per_date) replay queries  │
 │  - Manages concurrency and retries                       │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
         ┌─────────────────────────────────────┐
         │  Replay Persistent Queries           │
-        │  - Each session: (date, worker_id)   │
+        │  - Each session: (date, partition_id) │
         │  - Receives env variables            │
         │  - Executes worker script            │
         │  - Writes to shared tables           │
@@ -120,7 +120,7 @@ This validates your configuration without creating any sessions.
 replay-orchestrator --config simple_worker/config.yaml
 ```
 
-This will create 10 replay sessions (5 weekdays × 2 workers per date). Monitor progress in the console output. Press Ctrl+C to gracefully stop (finishes current operations before exiting).
+This will create 10 replay sessions (5 weekdays × 2 partitions per date). Monitor progress in the console output. Press Ctrl+C to gracefully stop (finishes current operations before exiting).
 
 ## Command-Line Options
 
@@ -166,7 +166,7 @@ name: "my_simulation"
 **Parameters:**
 
 - `name` (required): Unique identifier for this simulation run. Used to:
-  - Namespace persistent query names (format: `replay_{name}_{YYYYMMDD}_{worker_id}`, e.g., `replay_mysim_20240115_0`)
+  - Namespace persistent query names (format: `replay_{name}_{YYYYMMDD}_{partition_id}`, e.g., `replay_mysim_20240115_0`)
   - Avoid conflicts when running multiple simulations
   - Available to worker scripts via `SIMULATION_NAME` environment variable
 
@@ -196,7 +196,7 @@ deephaven:
 ```yaml
 execution:
   worker_script: "simple_worker.py"
-  num_workers: 10
+  num_partitions: 10
   max_concurrent_sessions: 50
   max_retries: 3
 ```
@@ -204,7 +204,7 @@ execution:
 **Parameters:**
 
 - `worker_script` (required): Path to worker Python script (absolute or relative to config file directory)
-- `num_workers` (required): Number of parallel workers per date (range: 1-1000). Each worker receives a unique `WORKER_ID` (0 to num_workers-1)
+- `num_partitions` (required): Number of parallel partitions per date (range: 1-1000). Each partition receives a unique `PARTITION_ID` (0 to num_partitions-1)
 - `max_concurrent_sessions` (required): Maximum total replay sessions running simultaneously across all dates (range: 1-1000)
 - `max_retries` (optional, default: 3): Number of retry attempts for failed sessions
 - `max_failures` (optional, default: 10): Maximum execution failures before aborting. Orchestrator stops when this limit is reached to prevent cascading errors
@@ -318,9 +318,9 @@ The orchestrator automatically sets these environment variables for each worker 
 
 - `SIMULATION_NAME`: The simulation name from the config
 - `SIMULATION_DATE`: The date being processed (YYYY-MM-DD string format)
-- `WORKER_ID`: Worker partition ID (0 to NUM_WORKERS-1) for dividing work across workers
-- `NUM_WORKERS`: Total number of workers per date
-- `QUERY_NAME`: The persistent query name (`replay_{name}_{YYYYMMDD}_{worker_id}`)
+- `PARTITION_ID`: Partition ID (0 to NUM_PARTITIONS-1) for dividing work across partitions
+- `NUM_PARTITIONS`: Total number of partitions per date
+- `QUERY_NAME`: The persistent query name (`replay_{name}_{YYYYMMDD}_{partition_id}`)
 
 **Note:** For date operations in your worker script, use [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today) from the [`deephaven.time`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html) module rather than `SIMULATION_DATE`. The [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today) function works correctly in both replay and production environments.
 
@@ -335,16 +335,16 @@ from deephaven.time import dh_today
 # Get date using dh_today() - works in both backtesting and production
 date = dh_today()  # "2024-01-15" during replay
 
-# Read worker partitioning variables
-worker_id = int(os.getenv("WORKER_ID"))      # 0-9 for this date
-num_workers = int(os.getenv("NUM_WORKERS"))  # 10 workers per date
+# Read data partitioning variables
+partition_id = int(os.getenv("PARTITION_ID"))      # 0-9 for this date
+num_partitions = int(os.getenv("NUM_PARTITIONS"))  # 10 partitions per date
 
 # Alternative: SIMULATION_DATE environment variable (for debugging)
 date_str = os.getenv("SIMULATION_DATE")  # "2024-01-15"
 
-# Partition work across workers (example: split stocks across workers for this date)
+# Partition work across partitions (example: split stocks across partitions for this date)
 all_stocks = get_stock_list()
-my_stocks = all_stocks[worker_id::num_workers]  # This worker processes every Nth stock
+my_stocks = all_stocks[partition_id::num_partitions]  # This partition processes every Nth stock
 
 # Process data for this date and stocks
 process_data(date, my_stocks)
@@ -363,7 +363,7 @@ Location: [`simple_worker/`](simple_worker/)
 
 **What it does**: Creates a status table showing which worker processed which date.
 
-**Scale**: 2 workers per date × 5 weekdays (Jan 1-5, 2024) = 10 sessions
+**Scale**: 2 partitions per date × 5 weekdays (Jan 1-5, 2024) = 10 sessions
 
 See [`simple_worker/README.md`](simple_worker/README.md) for details.
 
@@ -381,7 +381,7 @@ Location: [`trading_simulation/`](trading_simulation/)
 - Write trades/positions/PnL to partitioned tables
 - Based on [`examples/finance/simulated_market_maker`](../finance/simulated_market_maker)
 
-**Scale**: 10 workers per date × 250 trading days = 2,500 sessions
+**Scale**: 10 partitions per date × 250 trading days = 2,500 sessions
 
 See [`trading_simulation/README.md`](trading_simulation/README.md) for implementation details.
 
@@ -392,8 +392,8 @@ See [`trading_simulation/README.md`](trading_simulation/README.md) for implement
 The orchestrator provides real-time progress information:
 
 ```text
-[2024-01-15 10:30:00] INFO: Created session 5/60: date=2024-01-15, worker=2, serial=12345
-[2024-01-15 10:30:05] INFO: Session completed successfully: date=2024-01-15, worker=0
+[2024-01-15 10:30:00] INFO: Created session 5/60: date=2024-01-15, partition=2, serial=12345
+[2024-01-15 10:30:05] INFO: Session completed successfully: date=2024-01-15, partition=0
 [2024-01-15 10:30:10] WARNING: No progress for 10 iterations. Created: 10, Active: 5, Pending: 45, Completed: 5, Failed: 0
 ```
 
@@ -410,7 +410,7 @@ The orchestrator provides real-time progress information:
 In the Deephaven Enterprise UI:
 
 1. Navigate to **Persistent Queries** section
-2. Look for queries named: `replay_{simulation_name}_{date}_{worker_id}`
+2. Look for queries named: `replay_{simulation_name}_{date}_{partition_id}`
 3. Check status: Running, Completed, Failed, etc.
 4. View logs and output tables for each query
 
@@ -426,11 +426,11 @@ Worker scripts write to shared tables. Access them:
 
 1. **Configuration**: Load worker's `config.yaml` and validate all settings
 2. **Authentication**: Connect to Deephaven Enterprise with configured credentials
-3. **Task Generation**: Create (dates × workers_per_date) combinations
+3. **Task Generation**: Create (dates × partitions_per_date) combinations
 4. **Session Creation**: For each task:
    - Build `PersistentQueryConfigMessage` with replay parameters
    - Set replay date, speed, time in `typeSpecificFieldsJson`
-   - Add environment variables (SIMULATION_NAME, SIMULATION_DATE, WORKER_ID, NUM_WORKERS, custom vars)
+   - Add environment variables (SIMULATION_NAME, SIMULATION_DATE, PARTITION_ID, NUM_PARTITIONS, custom vars)
    - Create replay persistent query via controller client
 5. **Concurrency Management**: Run up to `max_concurrent_sessions` using subscription-based status monitoring
 6. **Retry Logic**: Retry failed session creation up to `max_retries` times with exponential backoff
@@ -450,13 +450,13 @@ The orchestrator configures replay persistent queries with:
 
 ## Best Practices
 
-1. **Start Small**: Test with a small date range and few workers first to verify your setup is working correctly.
+1. **Start Small**: Test with a small date range and few partitions first to verify your setup is working correctly.
 
 2. **Test Your Worker Script**: Verify your worker script functions correctly before running large-scale orchestration.
 
 3. **Monitor Resources**: Check your Deephaven server capacity and adjust `max_concurrent_sessions` accordingly.
 
-4. **Partition Efficiently**: Design your worker partitioning logic to distribute work evenly across workers.
+4. **Partition Data Efficiently**: Design your data partitioning logic to distribute work evenly across partitions.
 
 5. **Use Weekdays Only**: For financial data, enable `weekdays_only: true` to skip weekends.
 
@@ -475,7 +475,7 @@ python replay_orchestrator.py --config your_config.yaml --dry-run
 Common validation errors:
 
 - Missing required fields (name, heap_size_gb, worker_script, etc.)
-- Invalid value ranges (heap_size_gb > 512, num_workers > 1000, replay_speed > 100)
+- Invalid value ranges (heap_size_gb > 512, num_partitions > 1000, replay_speed > 100)
 - Wrong types (env must be a dictionary, not null)
 - Invalid date format (must be YYYY-MM-DD)
 
@@ -555,7 +555,7 @@ The orchestrator validates all configuration before execution. Here's a quick re
 | `replay_start` | string | HH:MM:SS | - | Yes |
 | `replay_speed` | number | 1.0-100.0 | - | Yes |
 | `script_language` | string | "Python" or "Groovy" | - | Yes |
-| `num_workers` | int | 1-1000 | - | Yes |
+| `num_partitions` | int | 1-1000 | - | Yes |
 | `max_concurrent_sessions` | int | 1-1000 | - | Yes |
 | `max_retries` | int | ≥0 | 3 | No |
 | `delete_successful_queries` | bool | true/false | true | No |

@@ -2,7 +2,7 @@
 """
 Generic Replay Orchestrator for Deephaven Enterprise
 
-This script orchestrates the execution of replay persistent queries across multiple dates and workers.
+This script orchestrates the execution of replay persistent queries across multiple dates and partitions.
 It creates and manages Deephaven Enterprise replay sessions based on a configuration file.
 
 Usage:
@@ -58,7 +58,7 @@ DEFAULT_RESTART_USERS = 1  # Number of concurrent users for restart
 
 
 class ReplayOrchestrator:
-    """Orchestrates replay persistent query execution across dates and workers."""
+    """Orchestrates replay persistent query execution across dates and partitions."""
     
     def __init__(self, config_path: str, dry_run: bool = False):
         """Initialize orchestrator with configuration file.
@@ -71,7 +71,7 @@ class ReplayOrchestrator:
         self.dry_run = dry_run
         self.config: Dict[str, Any] = self._load_config()
         self.session_mgr: Optional[SessionManager] = None
-        self.sessions: Dict[Tuple[str, int], int] = {}  # (date, worker_id) -> serial
+        self.sessions: Dict[Tuple[str, int], int] = {}  # (date, partition_id) -> serial
         self.failed_sessions: List[Tuple[str, int]] = []
         self.retry_counts: Dict[Tuple[str, int], int] = {}
         self.worker_script_content: Optional[str] = None
@@ -131,7 +131,7 @@ class ReplayOrchestrator:
         """Validate that each section has required fields and no unexpected fields."""
         required_fields = {
             'deephaven': ['connection_url', 'auth_method', 'username'],
-            'execution': ['worker_script', 'num_workers', 'max_concurrent_sessions'],
+            'execution': ['worker_script', 'num_partitions', 'max_concurrent_sessions'],
             'replay': ['heap_size_gb', 'replay_start', 'replay_speed', 'script_language'],
             'dates': ['start', 'end']
         }
@@ -140,7 +140,7 @@ class ReplayOrchestrator:
             'deephaven': {'connection_url', 'auth_method', 'username', 'password', 'private_key_path'},
             'execution': {
                 'worker_script',
-                'num_workers',
+                'num_partitions',
                 'max_concurrent_sessions',
                 'max_retries',
                 'max_failures',
@@ -214,13 +214,13 @@ class ReplayOrchestrator:
         if not isinstance(worker_script, str) or not worker_script.strip():
             raise ValueError("worker_script must be a non-empty string")
         
-        workers = exec_config['num_workers']
-        if not isinstance(workers, int):
-            raise ValueError(f"num_workers must be an integer (got {type(workers).__name__})")
-        if workers <= 0:
-            raise ValueError(f"num_workers must be > 0 (got {workers})")
-        if workers > 1000:
-            raise ValueError(f"num_workers too high (got {workers}, max 1000)")
+        partitions = exec_config['num_partitions']
+        if not isinstance(partitions, int):
+            raise ValueError(f"num_partitions must be an integer (got {type(partitions).__name__})")
+        if partitions <= 0:
+            raise ValueError(f"num_partitions must be > 0 (got {partitions})")
+        if partitions > 1000:
+            raise ValueError(f"num_partitions too high (got {partitions}, max 1000)")
         
         if 'max_concurrent_sessions' in exec_config:
             concurrent = exec_config['max_concurrent_sessions']
@@ -402,26 +402,26 @@ class ReplayOrchestrator:
         errors = 0
         
         for session_key, serial in self.sessions.items():
-            date, worker_id = session_key
+            date, partition_id = session_key
             try:
                 # Try to stop the query first
                 try:
                     self.session_mgr.controller_client.stop_query(serial)
                     stopped += 1
-                    logger.debug(f"Stopped session: date={date}, worker={worker_id}, serial={serial}")
+                    logger.debug(f"Stopped session: date={date}, partition={partition_id}, serial={serial}")
                 except Exception as e:
-                    logger.debug(f"Could not stop session (may already be stopped): date={date}, worker={worker_id}, error={e}")
+                    logger.debug(f"Could not stop session (may already be stopped): date={date}, partition={partition_id}, error={e}")
                 
                 # Try to delete the query
                 try:
                     self.session_mgr.controller_client.delete_query(serial)
                     deleted += 1
-                    logger.debug(f"Deleted session: date={date}, worker={worker_id}, serial={serial}")
+                    logger.debug(f"Deleted session: date={date}, partition={partition_id}, serial={serial}")
                 except Exception as e:
-                    logger.debug(f"Could not delete session (may already be deleted): date={date}, worker={worker_id}, error={e}")
+                    logger.debug(f"Could not delete session (may already be deleted): date={date}, partition={partition_id}, error={e}")
                     errors += 1
             except Exception as e:
-                logger.error(f"Error cleaning up session: date={date}, worker={worker_id}, error={e}")
+                logger.error(f"Error cleaning up session: date={date}, partition={partition_id}, error={e}")
                 errors += 1
         
         logger.info(f"Cleanup complete: {stopped} stopped, {deleted} deleted, {errors} errors")
@@ -569,12 +569,12 @@ class ReplayOrchestrator:
         else:
             logger.debug(f"Using cached worker script content ({len(self.worker_script_content)} bytes)")
     
-    def _build_pq_basic_fields(self, config_msg: PersistentQueryConfigMessage, date: str, worker_id: int):
+    def _build_pq_basic_fields(self, config_msg: PersistentQueryConfigMessage, date: str, partition_id: int):
         """Populate basic fields in PersistentQueryConfigMessage."""
         config_msg.serial = PQ_SERIAL_NEW
         config_msg.version = 1
         config_msg.configurationType = "ReplayScript"
-        config_msg.name = f"replay_{self.config['name']}_{date.replace('-', '')}_{worker_id}"
+        config_msg.name = f"replay_{self.config['name']}_{date.replace('-', '')}_{partition_id}"
         config_msg.owner = self.config['deephaven']['username']
         config_msg.enabled = True
         config_msg.serverName = self.config['replay'].get('server_name', 'AutoQuery')
@@ -617,12 +617,12 @@ class ReplayOrchestrator:
         }
         return json.dumps(encoded_fields)
     
-    def _build_pq_environment_vars(self, date: str, worker_id: int, query_name: str) -> list:
+    def _build_pq_environment_vars(self, date: str, partition_id: int, query_name: str) -> list:
         """Build environment variables list in alternating name/value pairs.
         
         Args:
             date: Simulation date
-            worker_id: Worker ID
+            partition_id: Partition ID
             query_name: Query name for QUERY_NAME environment variable
             
         Returns:
@@ -631,8 +631,8 @@ class ReplayOrchestrator:
         env_vars = [
             "SIMULATION_NAME", self.config['name'],
             "SIMULATION_DATE", date,
-            "WORKER_ID", str(worker_id),
-            "NUM_WORKERS", str(self.config['execution']['num_workers']),
+            "PARTITION_ID", str(partition_id),
+            "NUM_PARTITIONS", str(self.config['execution']['num_partitions']),
             "QUERY_NAME", query_name
         ]
         
@@ -684,16 +684,16 @@ class ReplayOrchestrator:
             restart_daily=False
         )
     
-    def _build_persistent_query_config(self, date: str, worker_id: int) -> PersistentQueryConfigMessage:
-        """Build PersistentQueryConfigMessage for a specific date and worker."""
+    def _build_persistent_query_config(self, date: str, partition_id: int) -> PersistentQueryConfigMessage:
+        """Build PersistentQueryConfigMessage for a specific date and partition."""
         config_msg = PersistentQueryConfigMessage()
         
         self._load_worker_script_content()
-        self._build_pq_basic_fields(config_msg, date, worker_id)
+        self._build_pq_basic_fields(config_msg, date, partition_id)
         
         config_msg.typeSpecificFieldsJson = self._build_pq_replay_fields(date)
         
-        env_vars = self._build_pq_environment_vars(date, worker_id, config_msg.name)
+        env_vars = self._build_pq_environment_vars(date, partition_id, config_msg.name)
         config_msg.extraEnvironmentVariables.extend(env_vars)
         
         jvm_args = self._build_pq_jvm_arguments()
@@ -704,59 +704,59 @@ class ReplayOrchestrator:
         
         return config_msg
     
-    def _create_session(self, date: str, worker_id: int) -> Tuple[bool, Optional[int]]:
+    def _create_session(self, date: str, partition_id: int) -> Tuple[bool, Optional[int]]:
         """Create a replay persistent query session.
         
         Args:
             date: Date string in YYYY-MM-DD format
-            worker_id: Worker ID number
+            partition_id: Partition ID number
             
         Returns:
             Tuple of (success: bool, serial: Optional[int])
         """
         if self.dry_run:
-            logger.info(f"[DRY RUN] Would create session: date={date}, worker={worker_id}")
+            logger.info(f"[DRY RUN] Would create session: date={date}, partition={partition_id}")
             return True, -1  # Fake serial for dry run
         
-        session_key = (date, worker_id)
+        session_key = (date, partition_id)
         
         try:
-            config_msg = self._build_persistent_query_config(date, worker_id)
+            config_msg = self._build_persistent_query_config(date, partition_id)
             serial = self.session_mgr.controller_client.add_query(config_msg)
             
-            logger.info(f"Session created: date={date}, worker={worker_id}, serial={serial}")
+            logger.info(f"Session created: date={date}, partition={partition_id}, serial={serial}")
             return True, serial
             
         except (ConnectionError, TimeoutError) as e:
             logger.error(
-                f"Failed to create session (connection/timeout): date={date}, worker={worker_id}, "
+                f"Failed to create session (connection/timeout): date={date}, partition={partition_id}, "
                 f"error={e}. Check network connectivity and server availability."
             )
             return False, None
         except ValueError as e:
             logger.error(
-                f"Failed to create session (configuration error): date={date}, worker={worker_id}, "
+                f"Failed to create session (configuration error): date={date}, partition={partition_id}, "
                 f"error={e}. Review worker script and replay configuration."
             )
             return False, None
         except Exception as e:
             logger.error(
-                f"Failed to create session (unexpected error): date={date}, worker={worker_id}, "
+                f"Failed to create session (unexpected error): date={date}, partition={partition_id}, "
                 f"error={type(e).__name__}: {e}"
             )
             return False, None
     
     def _generate_session_tasks(self) -> List[Tuple[str, int]]:
-        """Generate list of (date, worker_id) tuples for all sessions."""
+        """Generate list of (date, partition_id) tuples for all sessions."""
         dates = self._generate_dates()
-        num_workers = self.config['execution']['num_workers']
+        num_partitions = self.config['execution']['num_partitions']
         
         tasks = []
         for date in dates:
-            for worker_id in range(num_workers):
-                tasks.append((date, worker_id))
+            for partition_id in range(num_partitions):
+                tasks.append((date, partition_id))
         
-        logger.info(f"Generated {len(tasks)} tasks ({len(dates)} dates × {num_workers} workers)")
+        logger.info(f"Generated {len(tasks)} tasks ({len(dates)} dates × {num_partitions} partitions)")
         return tasks
     
     def _get_running_session_count(self, pq_info_map: Dict[int, Any], active_sessions: Set[Tuple[str, int]]) -> int:
@@ -764,7 +764,7 @@ class ReplayOrchestrator:
         
         Args:
             pq_info_map: Map of serial -> PQ info from controller
-            active_sessions: Set of (date, worker_id) tuples currently active
+            active_sessions: Set of (date, partition_id) tuples currently active
             
         Returns:
             Count of active (non-terminal) sessions including initializing, acquiring workers, and running
@@ -796,7 +796,7 @@ class ReplayOrchestrator:
         """Check status of a session.
         
         Args:
-            session_key: Tuple of (date, worker_id)
+            session_key: Tuple of (date, partition_id)
             pq_info_map: Map of serial -> PQ info from controller
             
         Returns:
@@ -826,12 +826,12 @@ class ReplayOrchestrator:
                 return 'completed'
             else:
                 # Check if this is a resource unavailability failure
-                date, worker_id = session_key
+                date, partition_id = session_key
                 exception_details = pq_info.state.exceptionDetails
                 exception_str = str(exception_details) if exception_details else ''
                 
                 # DEBUG: Log exception details and pattern matching
-                logger.warning(f"[DEBUG] Session failed: date={date}, worker={worker_id}, status={status_name}")
+                logger.warning(f"[DEBUG] Session failed: date={date}, partition={partition_id}, status={status_name}")
                 logger.warning(f"[DEBUG] Exception (first 1000 chars): {exception_str[:1000]}")
                 
                 has_resources_unavailable = 'ResourcesUnavailableException' in exception_str
@@ -864,7 +864,7 @@ class ReplayOrchestrator:
         """Print configuration summary."""
         logger.info(f"Total sessions to create: {total_tasks}")
         logger.info(f"Dates: {self.config['dates']['start']} to {self.config['dates']['end']}")
-        logger.info(f"Workers: {self.config['execution']['num_workers']}")
+        logger.info(f"Partitions: {self.config['execution']['num_partitions']}")
         logger.info(f"Max concurrent sessions: {max_concurrent}")
         logger.info(f"Max retries: {max_retries}")
     
@@ -873,21 +873,21 @@ class ReplayOrchestrator:
         """Handle session creation failure with retry logic.
         
         Args:
-            session_key: Tuple of (date, worker_id)
+            session_key: Tuple of (date, partition_id)
             max_retries: Maximum retry attempts
             pending_tasks: Deque to add retry tasks to (modified in place)
         """
-        date, worker_id = session_key
+        date, partition_id = session_key
         retry_count = self.retry_counts.get(session_key, 0)
         
         if retry_count < max_retries:
             self.retry_counts[session_key] = retry_count + 1
-            pending_tasks.appendleft((date, worker_id))
-            logger.warning(f"Retrying session: date={date}, worker={worker_id} (attempt {retry_count + 1}/{max_retries})")
+            pending_tasks.appendleft((date, partition_id))
+            logger.warning(f"Retrying session: date={date}, partition={partition_id} (attempt {retry_count + 1}/{max_retries})")
             time.sleep(DEFAULT_RETRY_DELAY_SECONDS)
         else:
             self.retry_counts.pop(session_key, None)
-            logger.error(f"Failed to create session after {max_retries} retries: date={date}, worker={worker_id}")
+            logger.error(f"Failed to create session after {max_retries} retries: date={date}, partition={partition_id}")
     
     def _launch_pending_sessions(self, pending_tasks: Deque[Tuple[str, int]], active_sessions: Set[Tuple[str, int]], 
                                  max_concurrent: int, max_retries: int, total_tasks: int, 
@@ -895,8 +895,8 @@ class ReplayOrchestrator:
         """Launch sessions up to capacity.
         
         Args:
-            pending_tasks: Deque of (date, worker_id) tasks to launch
-            active_sessions: Set of currently active (date, worker_id) tuples (modified in place)
+            pending_tasks: Deque of (date, partition_id) tasks to launch
+            active_sessions: Set of currently active (date, partition_id) tuples (modified in place)
             max_concurrent: Maximum concurrent sessions allowed
             max_retries: Maximum retry attempts for failed creations
             total_tasks: Total number of tasks for logging
@@ -919,17 +919,17 @@ class ReplayOrchestrator:
                 logger.info("Shutdown requested, stopping session creation")
                 break
             
-            date, worker_id = pending_tasks.popleft()
-            session_key = (date, worker_id)
+            date, partition_id = pending_tasks.popleft()
+            session_key = (date, partition_id)
             
-            success, serial = self._create_session(date, worker_id)
+            success, serial = self._create_session(date, partition_id)
             
             if success:
                 self.sessions[session_key] = serial
                 active_sessions.add(session_key)
                 created_count += 1
                 self.retry_counts.pop(session_key, None)
-                logger.info(f"Created session {len(self.sessions)}/{total_tasks}: date={date}, worker={worker_id}, serial={serial}")
+                logger.info(f"Created session {len(self.sessions)}/{total_tasks}: date={date}, partition={partition_id}, serial={serial}")
             else:
                 self._handle_session_creation_failure(session_key, max_retries, pending_tasks)
         
@@ -939,14 +939,14 @@ class ReplayOrchestrator:
         """Handle resource unavailability by deleting PQ and re-queueing task.
         
         Args:
-            session_key: Tuple of (date, worker_id)
+            session_key: Tuple of (date, partition_id)
             pending_tasks: Deque to add retry task to (modified in place)
         """
-        date, worker_id = session_key
+        date, partition_id = session_key
         serial = self.sessions.get(session_key)
         
         logger.warning(
-            f"Resource unavailable for session: date={date}, worker={worker_id}, serial={serial}. "
+            f"Resource unavailable for session: date={date}, partition={partition_id}, serial={serial}. "
             f"Autoscaler has no available capacity. Deleting PQ and re-queueing for retry."
         )
         
@@ -962,7 +962,7 @@ class ReplayOrchestrator:
         self.sessions.pop(session_key, None)
         
         # Re-queue at front of pending tasks for immediate retry when capacity available
-        pending_tasks.appendleft((date, worker_id))
+        pending_tasks.appendleft((date, partition_id))
         
         # Wait before continuing to allow autoscaler time to provision
         time.sleep(5)
@@ -971,23 +971,23 @@ class ReplayOrchestrator:
         """Log detailed failure information for a session.
         
         Args:
-            session_key: Tuple of (date, worker_id)
+            session_key: Tuple of (date, partition_id)
             pq_info_map: Current PQ info map from controller
         """
-        date, worker_id = session_key
+        date, partition_id = session_key
         serial = self.sessions.get(session_key)
         
         if serial and serial in pq_info_map:
             status_name = self.session_mgr.controller_client.status_name(pq_info_map[serial].state.status)
             logger.error(
-                f"Session failed: date={date}, worker={worker_id}, serial={serial}, status={status_name}. "
+                f"Session failed: date={date}, partition={partition_id}, serial={serial}, status={status_name}. "
                 f"Check persistent query logs for serial {serial} for details. "
                 f"Session left in Deephaven for inspection. "
                 f"Common causes: script errors, insufficient heap memory, missing data."
             )
         else:
             logger.error(
-                f"Session failed: date={date}, worker={worker_id}. "
+                f"Session failed: date={date}, partition={partition_id}. "
                 f"Session info not available in PQ map."
             )
     
@@ -996,7 +996,7 @@ class ReplayOrchestrator:
         """Process active sessions, checking for completion or failure.
         
         Args:
-            active_sessions: Set of currently active (date, worker_id) tuples (modified in place)
+            active_sessions: Set of currently active (date, partition_id) tuples (modified in place)
             pq_info_map: Current PQ info map from controller
             pending_tasks: Deque to add resource-unavailable retries to (modified in place)
             
@@ -1014,13 +1014,13 @@ class ReplayOrchestrator:
         
         for session_key in list(active_sessions):
             status = self._check_session_status(session_key, pq_info_map)
-            date, worker_id = session_key
+            date, partition_id = session_key
             
             if status == 'completed':
                 active_sessions.remove(session_key)
                 completed_count += 1
                 self.retry_counts.pop(session_key, None)
-                logger.info(f"Session completed successfully: date={date}, worker={worker_id}")
+                logger.info(f"Session completed successfully: date={date}, partition={partition_id}")
             elif status == 'resource_unavailable':
                 active_sessions.remove(session_key)
                 self._handle_resource_unavailability(session_key, pending_tasks)
@@ -1103,12 +1103,12 @@ class ReplayOrchestrator:
                     deleted_failed += 1
                 else:
                     deleted_successful += 1
-                date, worker_id = session_key
-                logger.debug(f"Deleted {'failed' if is_failed else 'successful'} query: date={date}, worker={worker_id}, serial={serial}")
+                date, partition_id = session_key
+                logger.debug(f"Deleted {'failed' if is_failed else 'successful'} query: date={date}, partition={partition_id}, serial={serial}")
             except Exception as e:
                 failed_deletions += 1
-                date, worker_id = session_key
-                logger.warning(f"Failed to delete query: date={date}, worker={worker_id}, serial={serial}: {e}")
+                date, partition_id = session_key
+                logger.warning(f"Failed to delete query: date={date}, partition={partition_id}, serial={serial}: {e}")
         
         if deleted_successful > 0:
             logger.info(f"Deleted {deleted_successful} successful queries")
@@ -1129,8 +1129,8 @@ class ReplayOrchestrator:
         
         if self.failed_sessions:
             logger.error("Failed sessions:")
-            for date, worker_id in self.failed_sessions:
-                logger.error(f"  - date={date}, worker={worker_id}")
+            for date, partition_id in self.failed_sessions:
+                logger.error(f"  - date={date}, partition={partition_id}")
     
     def _setup_orchestration(self) -> Tuple[list, int, int, int, int]:
         """Setup orchestration: header, auth, tasks, and config.

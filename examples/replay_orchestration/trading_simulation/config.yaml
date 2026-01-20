@@ -8,8 +8,8 @@ deephaven:
   
 execution:
   worker_script: "trading_simulation.py"
-  num_workers: 10
-  max_concurrent_sessions: 20
+  num_partitions: 2
+  max_concurrent_sessions: 10
   
 replay:
   heap_size_gb: 16.0
