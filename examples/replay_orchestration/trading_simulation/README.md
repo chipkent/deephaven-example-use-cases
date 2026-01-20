@@ -26,7 +26,7 @@ worker_id = int(os.getenv("WORKER_ID"))      # 0-9 for this date
 num_workers = int(os.getenv("NUM_WORKERS"))  # 10 workers per date
 
 # Symbols are distributed using hash-based partitioning
-my_symbols = all_symbols.where(f"(int)(hashCode(Sym)) % {num_workers} == {worker_id}")
+my_symbols = all_symbols.where(f"Sym.hashCode() % {num_workers} == {worker_id}")
 ```
 
 **Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in `trading_simulation.py`.
