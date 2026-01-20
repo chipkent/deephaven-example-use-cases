@@ -29,7 +29,7 @@ num_partitions = int(os.getenv("NUM_PARTITIONS"))  # 2 partitions per date
 my_symbols = all_symbols.where(f"Sym.hashCode() % {num_partitions} == {partition_id}")
 ```
 
-**Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in `trading_simulation.py`.
+**Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in [`trading_simulation.py`](trading_simulation.py).
 
 ### Configuration
 
@@ -72,6 +72,7 @@ Auto-generated:
 ## Prerequisites
 
 See the [main README](../README.md) for setup instructions. This example requires:
+
 - Deephaven Enterprise with FeedOS access for historical equity quote data
 
 ## Quick Start
@@ -81,6 +82,7 @@ See the [main README](../README.md) for setup instructions. This example require
 **2. Clean existing tables** - Run [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console and call `delete_all_tables()` to remove any previous simulation data.
 
 **3. Run** - From the `replay_orchestration` directory:
+
 ```bash
 replay-orchestrator --config trading_simulation/config.yaml
 ```
@@ -101,24 +103,93 @@ Results are written to partitioned user tables in the namespace specified by `OU
 
 All tables include partition columns: `SimulationName`, `PartitionID`, `Date`
 
-## Querying Results
+## Analysis Tools
 
-Use [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console to access results:
+Two utility scripts are provided for working with simulation results in the Deephaven IDE console:
+
+### [analyze_trading_results.py](analyze_trading_results.py)
+
+Comprehensive quantitative analysis of simulation performance with professional risk metrics.
+
+**Load the script:**
+
+In the Deephaven IDE console, open the script file and execute it directly (use the "Run" button or Ctrl/Cmd+Enter).
+
+**Quick start workflow:**
 
 ```python
-# List tables and row counts
+# Your simulation name from config.yaml
+sim_name = "trading_simulation"
+
+# Step 1: Get high-level overview
+summary = get_summary(sim_name)
+winners = summary["top_performers"]      # Top 5 stocks by P&L
+losers = summary["bottom_performers"]    # Bottom 5 stocks by P&L
+
+# Step 2: Analyze overall performance
+pnl = analyze_pnl(sim_name)
+overall = pnl["overall"]                 # Sharpe ratio, max drawdown, win rate
+equity_curve = pnl["by_date"]            # Cumulative P&L over time
+
+# Step 3: Investigate specific stocks
+aapl = analyze_by_symbol(sim_name, "AAPL")
+aapl_stats = aapl["stats"]               # Performance summary for AAPL
+```
+
+**Available functions:**
+
+- `get_summary(sim_name)` - Start here! Overview with best/worst performers
+- `analyze_pnl(sim_name)` - P&L metrics: Sharpe ratio, max drawdown, win rate
+- `analyze_trades(sim_name)` - Trade statistics, turnover, buy/sell breakdown
+- `analyze_by_symbol(sim_name, sym)` - Deep dive on a specific stock
+- `analyze_by_date(sim_name, date)` - Analyze a specific trading day
+- `analyze_positions(sim_name)` - Position sizing and distribution
+- `analyze_executions(sim_name)` - Trading signal patterns
+
+**Key metrics explained:**
+
+- **Sharpe Ratio**: Risk-adjusted return (>1 is good, >2 is excellent)
+- **Max Drawdown**: Worst peak-to-trough decline (more negative = worse)
+- **Win Rate**: Percentage of profitable days (0.5 = 50%)
+- **Turnover**: Total dollar value traded (for transaction cost estimation)
+
+All functions return dictionaries of Deephaven tables that automatically display in the UI when assigned to variables.
+
+### [manage_user_tables.py](manage_user_tables.py)
+
+Table management utilities for accessing and cleaning simulation data.
+
+**Load the script:**
+
+In the Deephaven IDE console, open the script file and execute it directly (use the "Run" button or Ctrl/Cmd+Enter).
+
+**Common operations:**
+
+```python
+# List all simulation tables with row counts
 list_tables()
 
-# Get tables for analysis
+# Get a table for querying
 trades = get_table("TradingSimTrades")
 pnl = get_table("TradingSimPnl")
 
 # Query the data
 trades.where("Sym = `AAPL`").tail(100)
 pnl.view(["Date", "Sym", "PnL"])
+
+# Delete specific table
+delete_table("TradingSimTrades")
+
+# Delete all simulation data (use before new runs)
+delete_all_tables()
 ```
 
-To delete all simulation data: `delete_all_tables()`
+**Available functions:**
+
+- `list_tables()` - Show all tables in namespace with row counts
+- `get_table(name)` - Retrieve a table for analysis
+- `delete_table(name)` - Delete a specific table
+- `delete_all_tables()` - Delete all simulation tables (prompts for confirmation)
 
 ## Expected Results
 
@@ -136,17 +207,20 @@ All data will be queryable in Deephaven for analysis and visualization.
 ## Key Features
 
 **Data Partitioning**: Symbols are distributed across partitions using hash-based partitioning:
+
 ```python
 my_symbols = all_symbols.where(f"Sym.hashCode() % {num_partitions} == {partition_id}")
 ```
 
 **Mean-Reversion Strategy**:
+
 - Uses EMA and standard deviation to predict price movements
 - Buys when ask < (predicted price - 1 SD)
 - Sells when bid > (predicted price + 1 SD)
 - Position limits prevent excessive exposure
 
 **Replay Data**: Uses FeedOS `EquityQuoteL1` table filtered for:
+
 - Current replay date via `dh_today()`
 - Valid bid/ask quotes (size > 0)
 - Symbols assigned to this partition
@@ -161,8 +235,8 @@ See [`examples/finance/simulated_market_maker`](../../finance/simulated_market_m
 
 To adapt for your use case:
 
-1. **Change stock universe**: Modify the `all_symbols` table in `trading_simulation.py`
-2. **Adjust strategy parameters**: Update `MAX_POSITION_DOLLARS`, `EMA_DECAY_TIME`, `LOT_SIZE` in `config.yaml`
+1. **Change stock universe**: Modify the `all_symbols` table in [`trading_simulation.py`](trading_simulation.py)
+2. **Adjust strategy parameters**: Update `MAX_POSITION_DOLLARS`, `EMA_DECAY_TIME`, `LOT_SIZE` in [`config.yaml`](config.yaml)
 3. **Scale partitions**: Increase `num_partitions` to process more symbols in parallel
-4. **Adjust date range**: Modify `dates.start` and `dates.end` in `config.yaml`
+4. **Adjust date range**: Modify `dates.start` and `dates.end` in [`config.yaml`](config.yaml)
 5. **Speed up replay**: Increase `replay_speed` for faster backtesting (currently 100x)
