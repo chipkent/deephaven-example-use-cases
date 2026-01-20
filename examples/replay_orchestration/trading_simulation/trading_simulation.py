@@ -271,7 +271,6 @@ print(f"[INFO] Trading Simulation Worker Initialized Successfully")
 ############################################################################################################
 
 from deephaven_enterprise.client.session_manager import SessionManager
-import time
 
 print(f"[INFO] Monitoring until market close...")
 
