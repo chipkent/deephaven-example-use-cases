@@ -237,6 +237,13 @@ class ReplayOrchestrator:
                 raise ValueError(f"max_retries must be an integer (got {type(retries).__name__})")
             if retries < 0:
                 raise ValueError(f"max_retries must be >= 0 (got {retries})")
+        
+        if 'max_failures' in exec_config:
+            failures = exec_config['max_failures']
+            if not isinstance(failures, int):
+                raise ValueError(f"max_failures must be an integer (got {type(failures).__name__})")
+            if failures < 0:
+                raise ValueError(f"max_failures must be >= 0 (got {failures})")
     
     def _validate_execution_boolean_fields(self, exec_config: Dict):
         """Validate boolean fields in execution configuration."""
