@@ -1,10 +1,12 @@
-# Trading Simulation Example
+# Trading Simulation Replay Example
 
-A market maker simulation based on mean-reversion strategy, designed to backtest trading algorithms across historical data using the replay orchestration framework.
+A market maker simulation based on mean-reversion strategy, designed to backtest trading algorithms across historical data using the replay orchestration framework with realistic time-based data arrival.
 
 ## Overview
 
-This example implements a complete trading simulation based on [`examples/finance/simulated_market_maker`](../../finance/simulated_market_maker). It demonstrates how to run large-scale backtests by partitioning stocks across multiple partitions and processing historical dates in parallel.
+This example implements a complete trading simulation based on [`examples/finance/simulated_market_maker`](../../finance/simulated_market_maker). It demonstrates how to run large-scale backtests by partitioning stocks across multiple partitions and processing historical dates in parallel using replay mode (live data simulation).
+
+**Batch alternative**: For vectorized processing of complete historical datasets without time simulation, see [`trading_simulation_batch/`](../trading_simulation_batch/).
 
 ## Implementation
 
@@ -39,9 +41,12 @@ Key configuration settings:
 execution:
   num_partitions: 2            # 2 partitions per date (each processes a subset of stocks)
   max_concurrent_sessions: 10  # Max total sessions running concurrently
+  heap_size_gb: 16.0           # RAM allocated per session
+  script_language: "Python"
   
 replay:
-  heap_size_gb: 16.0           # RAM allocated per session
+  init_timeout_minutes: 30
+  replay_start: "09:30:00"
   replay_speed: 100.0          # 100x speed for faster backtesting
   
 dates:
@@ -84,7 +89,7 @@ See the [main README](../README.md) for setup instructions. This example require
 **3. Run** - From the `replay_orchestration` directory:
 
 ```bash
-replay-orchestrator --config trading_simulation/config.yaml
+replay-orchestrator --config trading_simulation_replay/config.yaml
 ```
 
 This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleReplayTradingSim` namespace. Tables are auto-created on first write.
@@ -119,7 +124,7 @@ In the Deephaven IDE console, open the script file and execute it directly (use 
 
 ```python
 # Your simulation name from config.yaml
-sim_name = "trading_simulation"
+sim_name = "trading_simulation_replay"
 
 # Step 1: Get high-level overview
 summary = get_summary(sim_name)

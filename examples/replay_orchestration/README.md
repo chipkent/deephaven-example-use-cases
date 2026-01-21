@@ -1,15 +1,26 @@
 # Replay Orchestration Framework
 
-A generic framework for orchestrating Deephaven Enterprise replay persistent queries across multiple dates with parallel partitions per date.
+A generic framework for orchestrating Deephaven Enterprise persistent queries across multiple dates with parallel partitions per date. Supports both **replay mode** (live data simulation) and **batch mode** (historical data processing).
 
+## Execution Modes
+
+### Replay Mode
 **What are replay persistent queries?** They allow you to run Deephaven queries against historical data as if it were live, making it possible to backtest strategies or reprocess data while maintaining the same code you'd use in production. See [Deephaven Replay Documentation](https://deephaven.io/enterprise/docs/deephaven-database/replayer/) for details.
 
-**Why multiple partitions per date?** Large datasets (e.g., thousands of stocks) can be divided across partitions to process in parallel, dramatically reducing backtest time. For example, 10 partitions can each process 1/10th of your stock universe simultaneously.
+**Use cases**: Strategy backtesting with realistic data arrival, testing production code on historical periods, reprocessing data with time-aware logic.
+
+### Batch Mode
+**What are batch persistent queries?** They process complete historical datasets using vectorized table operations, ideal for analytics and simulations that don't require time-based data arrival simulation.
+
+**Use cases**: Large-scale data analytics, Monte Carlo simulations, parameter sweeps, vectorized strategy backtests.
+
+**Why multiple partitions per date?** Large datasets (e.g., thousands of stocks) can be divided across partitions to process in parallel, dramatically reducing processing time. For example, 10 partitions can each process 1/10th of your stock universe simultaneously.
 
 ## Overview
 
-The replay orchestrator creates and manages replay persistent queries based on a configuration file. It:
+The orchestrator creates and manages persistent queries based on a configuration file. It:
 
+- **Supports dual modes**: Replay (ReplayScript) or Batch (RunAndDone) execution
 - **Parallelizes across dates**: Run simulations for multiple dates concurrently
 - **Partitions data within each date**: Split data processing across multiple partitions per date
 - **Handles retries**: Automatically retries failed sessions
@@ -23,14 +34,16 @@ The replay orchestrator creates and manages replay persistent queries based on a
 │                  Orchestrator                            │
 │  - Reads config.yaml                                     │
 │  - Authenticates with Deephaven Enterprise               │
-│  - Creates (dates × partitions_per_date) replay queries  │
+│  - Creates (dates × partitions_per_date) PQs             │
 │  - Manages concurrency and retries                       │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
         ┌─────────────────────────────────────┐
-        │  Replay Persistent Queries           │
+        │  Persistent Queries (Replay/Batch)   │
         │  - Each session: (date, partition_id) │
+        │  - Replay: ReplayScript (live data)  │
+        │  - Batch: RunAndDone (historical)    │
         │  - Receives env variables            │
         │  - Executes worker script            │
         │  - Writes to shared tables           │
@@ -39,38 +52,57 @@ The replay orchestrator creates and manages replay persistent queries based on a
 
 ## Use Cases
 
-- **Backtesting trading strategies**: Simulate trading across historical periods
+### Replay Mode
+- **Realistic strategy backtesting**: Test trading algorithms with realistic data arrival timing
+- **Production code validation**: Verify production queries work correctly on historical periods
+- **Time-aware reprocessing**: Reprocess data maintaining temporal relationships
+
+### Batch Mode
+- **Vectorized backtesting**: Fast strategy evaluation on complete historical datasets
 - **Risk analysis**: Calculate risk metrics across multiple scenarios
 - **Data processing**: Process large datasets by partitioning work
 - **Monte Carlo simulations**: Run simulations across parameter spaces
+- **Parameter sweeps**: Test strategy variations across different parameter combinations
 
 ## Directory Structure
 
 ```text
 replay_orchestration/
-├── README.md                    # This file
-├── setup.py                     # Package setup with dependencies
-├── replay_orchestrator.py      # Generic orchestrator script
-├── simple_worker/               # Minimal example
+├── README.md                        # This file
+├── setup.py                         # Package setup with dependencies
+├── replay_orchestrator.py          # Generic orchestrator script
+├── simple_worker_replay/            # Minimal replay example
 │   ├── simple_worker.py
 │   ├── config.yaml
 │   └── README.md
-└── trading_simulation/          # Trading example (placeholder)
-    ├── trading_simulation.py
+├── simple_worker_batch/             # Minimal batch example
+│   ├── simple_worker_batch.py
+│   ├── config.yaml
+│   └── README.md
+├── trading_simulation_replay/       # Trading replay example
+│   ├── trading_simulation.py
+│   ├── config.yaml
+│   └── README.md
+└── trading_simulation_batch/        # Trading batch example
+    ├── trading_simulation_batch.py
     ├── config.yaml
     └── README.md
 ```
 
-**Files**:
+**Core Files**:
 
 - [`setup.py`](setup.py) - Package setup with Python version enforcement
-- [`replay_orchestrator.py`](replay_orchestrator.py) - Main orchestrator script
-- [`simple_worker/simple_worker.py`](simple_worker/simple_worker.py) - Simple example worker
-- [`simple_worker/config.yaml`](simple_worker/config.yaml) - Simple worker configuration
-- [`simple_worker/README.md`](simple_worker/README.md) - Simple worker documentation
-- [`trading_simulation/trading_simulation.py`](trading_simulation/trading_simulation.py) - Trading simulation worker (placeholder implementation)
-- [`trading_simulation/config.yaml`](trading_simulation/config.yaml) - Trading configuration
-- [`trading_simulation/README.md`](trading_simulation/README.md) - Trading documentation
+- [`replay_orchestrator.py`](replay_orchestrator.py) - Main orchestrator script (supports both modes)
+
+**Replay Examples**:
+
+- [`simple_worker_replay/`](simple_worker_replay/) - Minimal replay example
+- [`trading_simulation_replay/`](trading_simulation_replay/) - Trading simulation with replay
+
+**Batch Examples**:
+
+- [`simple_worker_batch/`](simple_worker_batch/) - Minimal batch example
+- [`trading_simulation_batch/`](trading_simulation_batch/) - Trading simulation with vectorized batch processing
 
 ## Quick Start
 
@@ -166,7 +198,9 @@ name: "my_simulation"
 **Parameters:**
 
 - `name` (required): Unique identifier for this simulation run. Used to:
-  - Namespace persistent query names (format: `replay_{name}_{YYYYMMDD}_{partition_id}`, e.g., `replay_mysim_20240115_0`)
+  - Namespace persistent query names:
+    - Replay mode: `replay_{name}_{YYYYMMDD}_{partition_id}` (e.g., `replay_mysim_20240115_0`)
+    - Batch mode: `batch_{name}_{YYYYMMDD}_{partition_id}` (e.g., `batch_mysim_20240115_0`)
   - Avoid conflicts when running multiple simulations
   - Available to worker scripts via `SIMULATION_NAME` environment variable
 
@@ -195,43 +229,55 @@ deephaven:
 
 ```yaml
 execution:
-  worker_script: "simple_worker.py"
+  worker_script: "worker.py"
   num_partitions: 10
   max_concurrent_sessions: 50
-  max_retries: 3
+  heap_size_gb: 4.0
+  script_language: "Python"
+  jvm_profile: "Default"          # Optional
+  server_name: "AutoQuery"        # Optional
+  max_retries: 3                  # Optional
+  max_failures: 10                # Optional
+  delete_successful_queries: true # Optional
+  delete_failed_queries: false    # Optional
 ```
 
-**Parameters:**
+**Common Parameters (both modes):**
 
 - `worker_script` (required): Path to worker Python script (absolute or relative to config file directory)
 - `num_partitions` (required): Number of parallel partitions per date (range: 1-1000). Each partition receives a unique `PARTITION_ID` (0 to num_partitions-1)
-- `max_concurrent_sessions` (required): Maximum total replay sessions running simultaneously across all dates (range: 1-1000)
+- `max_concurrent_sessions` (required): Maximum total PQ sessions running simultaneously across all dates (range: 1-1000)
+- `heap_size_gb` (required): JVM heap size in GB allocated per session (range: >0 to 512)
+- `script_language` (required): Worker script language. Values: `"Python"` or `"Groovy"`
+- `jvm_profile` (optional, default: `"Default"`): JVM profile defining resource limits and JVM arguments
+- `server_name` (optional, default: `"AutoQuery"`): Target query server name. Default uses load balancer for distribution
 - `max_retries` (optional, default: 3): Number of retry attempts for failed sessions
-- `max_failures` (optional, default: 10): Maximum execution failures before aborting. Orchestrator stops when this limit is reached to prevent cascading errors
-- `delete_successful_queries` (optional, default: true): If true, automatically delete successfully completed queries after orchestrator finishes. Set to false to keep successful queries for inspection
-- `delete_failed_queries` (optional, default: false): If true, automatically delete failed queries after orchestrator finishes. Set to true to clean up failed queries. By default, failed queries are preserved for debugging
+- `max_failures` (optional, default: 10): Maximum execution failures before aborting
+- `delete_successful_queries` (optional, default: true): Auto-delete successful queries after completion
+- `delete_failed_queries` (optional, default: false): Auto-delete failed queries (default: preserve for debugging)
 
-### Replay Settings
+### Replay Settings (Replay Mode Only)
+
+**Note**: Use exactly **one** of `replay:` or `batch:` sections to define execution mode.
 
 ```yaml
 replay:
-  heap_size_gb: 4.0
   init_timeout_minutes: 10
-  script_language: "Python"
-  jvm_profile: "Default"
   replay_start: "09:30:00"
-  replay_speed: 1.0
-  sorted_replay: true
-  buffer_rows: 10000
+  replay_speed: 100.0
+  sorted_replay: true          # Optional
+  buffer_rows: 10000           # Optional
+  replay_timestamp_columns:    # Optional
+    - namespace: "Market"
+      table: "Trade"
+      column: "EventTime"
 ```
 
-**Core Parameters:**
+**Required Parameters:**
 
-- `heap_size_gb` (required): JVM heap size in GB allocated per session (range: >0 to 512, e.g., 4.0, 8.0)
-- `init_timeout_minutes` (optional, default: 1): How long to wait for PQ to initialize/start up, in minutes
-- `script_language` (required): Worker script language. Values: `"Python"` or `"Groovy"`
-- `jvm_profile` (optional, default: `"Default"`): JVM profile defining resource limits and JVM arguments
-- `server_name` (optional, default: `"AutoQuery"`): Target query server name for replay sessions. The default `"AutoQuery"` uses the Deephaven load balancer to automatically distribute queries across available servers for optimal load balancing. You can specify a specific server name (e.g., `"Query_1"`, `"Query_2"`) to target a particular server if needed.
+- `init_timeout_minutes` (required): How long to wait for PQ to initialize/start up, in minutes
+- `replay_start` (required): Time when replay starts each day, format `HH:MM:SS`
+- `replay_speed` (required): Speed multiplier for replay (range: 1.0-100.0)
 
 **Replay Behavior:**
 
@@ -262,6 +308,12 @@ targetCycleDurationMillis = 1000 / replay_speed
 
 **Note**: If your script is complex and cannot complete within the target cycle duration, Deephaven will add more data to subsequent cycles to catch up, potentially causing performance issues. Ensure your queries can execute within the scaled cycle time.
 
+**Optional Replay Settings:**
+
+- `sorted_replay` (optional, default: true): Guarantee timestamp-ordered data delivery
+- `buffer_rows` (optional): Number of rows to buffer during replay (sets `-DReplayDatabase.BufferSize`)
+- `replay_timestamp_columns` (optional): Per-table timestamp column overrides
+
 **Replay Database Settings:**
 
 - `buffer_rows` (optional): Number of rows to buffer during replay (sets `-DReplayDatabase.BufferSize`). See [Replay Database Settings](https://deephaven.io/enterprise/docs/deephaven-database/replayer/) for details.
@@ -279,7 +331,41 @@ targetCycleDurationMillis = 1000 / replay_speed
 
   Each entry sets `-DReplayDatabase.TimestampColumn.{namespace}.{table}={column}`
 
-**Note:** The framework automatically uses `ReplayScript` configuration type and fixed replay time type, which are optimal for backtesting scenarios. Persistent queries run immediately upon creation with a disabled scheduler (no time-of-day constraints).
+**Note:** The framework automatically uses `ReplayScript` configuration type and fixed replay time type, which are optimal for backtesting scenarios. Persistent queries run immediately upon creation with a continuous scheduler.
+
+### Batch Settings (Batch Mode Only)
+
+**Note**: Use exactly **one** of `replay:` or `batch:` sections to define execution mode.
+
+```yaml
+batch:
+  timeout_minutes: 60
+```
+
+**Parameters:**
+
+- `timeout_minutes` (required): Maximum runtime for each batch query in minutes. Batch queries (RunAndDone type) require a mandatory timeout. If a query exceeds this timeout, it will be terminated.
+
+**Batch Behavior:**
+
+- Queries use `RunAndDone` configuration type (auto-terminate after completion)
+- Scheduling is disabled (queries start immediately upon creation)
+- Worker scripts should use `db.historical_table()` instead of `db.live_table()`
+- No automatic `stop_and_wait()` call needed (RunAndDone handles termination)
+- Ideal for vectorized processing of complete historical datasets
+
+**Example batch worker:**
+
+```python
+# Get complete historical data for the date
+ticks = db.historical_table("FeedOS", "EquityQuoteL1") \
+    .where(f"Date == '{simulation_date}'")
+
+# Process using vectorized operations
+results = ticks.group_by(["Sym"]) \
+    .update(["Metric = compute_metric_udf(Price, Volume)"]) \
+    .ungroup()
+```
 
 ### Date Range
 

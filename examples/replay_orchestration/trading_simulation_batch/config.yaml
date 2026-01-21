@@ -1,4 +1,4 @@
-name: "trading_simulation"
+name: "trading_simulation_batch"
 
 deephaven:
   connection_url: "${DH_CONNECTION_URL}"
@@ -7,20 +7,14 @@ deephaven:
   password: "${DH_PASSWORD}"
   
 execution:
-  worker_script: "trading_simulation.py"
+  worker_script: "trading_simulation_batch.py"
   num_partitions: 2
   max_concurrent_sessions: 10
-  
-replay:
   heap_size_gb: 16.0
-  init_timeout_minutes: 30
   script_language: "Python"
-  replay_start: "09:30:00"
-  replay_speed: 100.0
-  replay_timestamp_columns:
-    - namespace: "FeedOS"
-      table: "EquityQuoteL1"
-      column: "Timestamp"
+
+batch:
+  timeout_minutes: 60
 
 dates:
   start: "2024-01-01"
@@ -28,7 +22,7 @@ dates:
   weekdays_only: true
   
 env:
-  OUTPUT_NAMESPACE: "ExampleReplayTradingSim"
+  OUTPUT_NAMESPACE: "ExampleBatchTradingSim"
   MAX_POSITION_DOLLARS: "10000"
   EMA_DECAY_TIME: "PT00:01:00"
   LOT_SIZE: "100"

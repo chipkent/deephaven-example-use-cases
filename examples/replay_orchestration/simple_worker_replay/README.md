@@ -1,6 +1,6 @@
-# Simple Worker Example
+# Simple Worker Replay Example
 
-This is a minimal example worker script to **verify the replay orchestration framework is working correctly**.
+This is a minimal replay mode example to **verify the replay orchestration framework is working correctly**.
 
 ## Purpose
 
@@ -11,7 +11,9 @@ This example is designed to:
 - **Demonstrate basic patterns**: Show how to read config values and use auto-generated variables
 - **Print diagnostic output**: Display values to console for verification
 
-**Note**: This example does **not** persist any data. It creates an in-memory table and prints values to demonstrate the orchestrator is working. For examples that write to shared tables, see the trading_simulation example.
+**Note**: This example does **not** persist any data. It creates an in-memory table and prints values to demonstrate the orchestrator is working.
+
+**Batch alternative**: For a non-replay version that processes historical data without time simulation, see [`simple_worker_batch/`](../simple_worker_batch/).
 
 ## Environment Variables
 
@@ -33,22 +35,31 @@ See `config.yaml` for the complete orchestrator configuration. Key settings:
 
 ```yaml
 execution:
-  num_partitions: 2           # Creates 2 partitions per date
-  
+  worker_script: "simple_worker.py"
+  num_partitions: 2
+  max_concurrent_sessions: 10
+  heap_size_gb: 4.0
+  script_language: "Python"
+
+replay:
+  init_timeout_minutes: 10
+  replay_start: "09:30:00"
+  replay_speed: 100.0
+
 dates:
   start: "2024-01-01"
   end: "2024-01-05"
   weekdays_only: true         # Only Mon-Fri (5 weekdays in this range)
 ```
 
-This creates 2 partitions per date × 5 weekdays = 10 total sessions.
+This creates 2 partitions per date × 5 weekdays = 10 total replay sessions.
 
 ## Running
 
 From the `replay_orchestration` directory:
 
 ```bash
-replay-orchestrator --config simple_worker/config.yaml
+replay-orchestrator --config simple_worker_replay/config.yaml
 ```
 
 ## Output
