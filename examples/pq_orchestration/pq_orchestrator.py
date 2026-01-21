@@ -6,7 +6,8 @@ This script orchestrates the execution of persistent queries (replay or batch mo
 It creates and manages Deephaven Enterprise sessions based on a configuration file.
 
 Usage:
-    python pq_orchestrator.py --config simple_worker/config.yaml
+    pq-orchestrator --config simple_worker_replay/config.yaml
+    pq-orchestrator --config simple_worker_batch/config.yaml --verbose
 """
 
 import argparse
@@ -668,7 +669,7 @@ class PersistentQueryOrchestrator:
         config_msg.serial = PQ_SERIAL_NEW
         config_msg.version = 1
         config_msg.configurationType = config_type
-        config_msg.name = f"{mode_prefix}_{self.config['name']}_{date.replace('-', '')}_{partition_id}"
+        config_msg.name = f"pq_{mode_prefix}_{self.config['name']}_{date.replace('-', '')}_{partition_id}"
         config_msg.owner = self.authenticated_user
         config_msg.enabled = True
         config_msg.serverName = self.config['execution'].get('server_name', 'AutoQuery')
@@ -832,7 +833,7 @@ class PersistentQueryOrchestrator:
         return config_msg
     
     def _create_session(self, date: str, partition_id: int) -> Tuple[bool, Optional[int]]:
-        """Create a replay persistent query session.
+        """Create a persistent query session (replay or batch mode).
         
         Args:
             date: Date string in YYYY-MM-DD format

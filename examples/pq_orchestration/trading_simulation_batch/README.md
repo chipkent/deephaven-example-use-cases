@@ -84,29 +84,17 @@ See the [main README](../README.md) for setup instructions. This example require
 
 **2. Clean existing tables** - Run [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console and call `delete_all_tables()` to remove any previous simulation data.
 
-**3. Run** - From the `pq_orchestration` directory:
+**3. Run** - Set environment variables and run from the `pq_orchestration` directory:
 
-```bash
-pq-orchestrator --config trading_simulation_batch/config.yaml
-```
-
-This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleBatchTradingSim` namespace. Tables are auto-created on first write.
-
-## Running
-
-Set environment variables:
 ```bash
 export DH_CONNECTION_URL="https://your-server:8000/iris/connection.json"
 export DH_USERNAME="your_username"
 export DH_PASSWORD="your_password"
-```
 
-Run the orchestrator:
-```bash
 pq-orchestrator --config trading_simulation_batch/config.yaml
 ```
 
-Monitor progress in the console output. Press Ctrl+C to gracefully stop.
+This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleBatchTradingSim` namespace. Tables are auto-created on first write. Monitor progress in the console output. Press Ctrl+C to gracefully stop.
 
 ## Output Tables
 

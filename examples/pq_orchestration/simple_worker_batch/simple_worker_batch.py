@@ -1,3 +1,21 @@
+"""
+Simple Worker - Batch Mode
+
+Minimal example worker script for batch mode persistent queries.
+Creates a simple status table. No stop_and_wait() needed - batch queries auto-terminate.
+
+Required Environment Variables:
+    - SIMULATION_NAME: Name of the simulation
+    - SIMULATION_DATE: Date being processed (YYYY-MM-DD)
+    - PARTITION_ID: Partition ID (0 to NUM_PARTITIONS-1)
+    - NUM_PARTITIONS: Total number of partitions
+    - LOG_LEVEL: Logging level (default: INFO)
+    - CUSTOM_MESSAGE: Optional custom message
+
+Output:
+    - worker_status: Simple status table with partition info
+"""
+
 import os
 from deephaven import new_table
 from deephaven.column import string_col, int_col

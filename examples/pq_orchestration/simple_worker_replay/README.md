@@ -24,18 +24,18 @@ The orchestrator automatically provides:
 - `PARTITION_ID`: The partition ID (0 to NUM_PARTITIONS-1) for partitioning data
 - `NUM_PARTITIONS`: Total number of partitions per date
 
-From `config.yaml` env section:
+From [`config.yaml`](config.yaml) env section:
 
 - `LOG_LEVEL`: Logging level
 - `CUSTOM_MESSAGE`: Example custom parameter (demonstrates how to pass configuration to workers)
 
 ## Configuration
 
-See `config.yaml` for the complete orchestrator configuration. Key settings:
+See [`config.yaml`](config.yaml) for the complete orchestrator configuration. Key settings:
 
 ```yaml
 execution:
-  worker_script: "simple_worker.py"
+  worker_script: "simple_worker.py"  # Worker script file
   num_partitions: 2
   max_concurrent_sessions: 10
   heap_size_gb: 4.0
@@ -93,3 +93,9 @@ After running, check the orchestrator console output to verify:
 - Each session completed successfully
 - No failures reported
 - Exit code 0 (success)
+
+## Files
+
+- [`simple_worker.py`](simple_worker.py) - Worker script
+- [`config.yaml`](config.yaml) - Replay configuration
+- [`README.md`](README.md) - This file

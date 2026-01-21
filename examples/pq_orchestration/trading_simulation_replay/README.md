@@ -123,7 +123,7 @@ In the Deephaven IDE console, open the script file and execute it directly (use 
 **Quick start workflow:**
 
 ```python
-# Your simulation name from config.yaml
+# Your simulation name from config.yaml (line 1 of config.yaml)
 sim_name = "trading_simulation_replay"
 
 # Step 1: Get high-level overview
@@ -245,3 +245,11 @@ To adapt for your use case:
 3. **Scale partitions**: Increase `num_partitions` to process more symbols in parallel
 4. **Adjust date range**: Modify `dates.start` and `dates.end` in [`config.yaml`](config.yaml)
 5. **Speed up replay**: Increase `replay_speed` for faster backtesting (currently 100x)
+
+## Files
+
+- [`trading_simulation.py`](trading_simulation.py) - Replay worker script
+- [`config.yaml`](config.yaml) - Replay configuration
+- [`manage_user_tables.py`](manage_user_tables.py) - Table management utilities
+- [`analyze_trading_results.py`](analyze_trading_results.py) - Performance analysis tools
+- [`README.md`](README.md) - This file

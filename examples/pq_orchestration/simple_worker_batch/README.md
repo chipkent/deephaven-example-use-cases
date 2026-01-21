@@ -1,59 +1,103 @@
 # Simple Worker Batch Example
 
-A minimal batch mode example demonstrating the persistent query orchestrator framework with batch persistent queries.
+A minimal batch mode example to **verify the PQ orchestration framework is working correctly**.
 
-## Overview
+## Purpose
 
-This example creates batch (RunAndDone) persistent queries that process historical data without replay functionality. It's designed to verify the PQ orchestration infrastructure works correctly.
+This example is designed to:
 
-## What It Does
+- **Test the orchestrator**: Verify batch mode sessions are created and executed successfully
+- **Validate environment variables**: Confirm all expected variables are passed correctly
+- **Demonstrate batch patterns**: Show how batch queries auto-terminate (no `stop_and_wait()` needed)
+- **Print diagnostic output**: Display values to console for verification
 
-Creates a simple status table showing which worker processed which date and partition. The query runs once and terminates automatically.
+**Note**: This example does **not** persist any data. It creates an in-memory table and prints values to demonstrate the orchestrator is working.
+
+**Replay alternative**: For a replay version that simulates time-based data arrival, see [`simple_worker_replay/`](../simple_worker_replay/).
 
 ## Key Differences from Replay Version
 
 - Uses `batch:` configuration section instead of `replay:`
 - Configured with `timeout_minutes` instead of `init_timeout_minutes`
 - No `stop_and_wait()` call (RunAndDone auto-terminates)
-- Persistent queries named `batch_*` instead of `replay_*`
+- Persistent queries named `pq_batch_*` instead of `pq_replay_*`
+
+## Environment Variables
+
+The orchestrator automatically provides:
+
+- `SIMULATION_NAME`: Unique simulation identifier from config top-level `name` field
+- `SIMULATION_DATE`: The date being processed (YYYY-MM-DD) - also available via [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today)
+- `PARTITION_ID`: The partition ID (0 to NUM_PARTITIONS-1) for partitioning data
+- `NUM_PARTITIONS`: Total number of partitions per date
+
+From [`config.yaml`](config.yaml) env section:
+
+- `LOG_LEVEL`: Logging level
+- `CUSTOM_MESSAGE`: Example custom parameter (demonstrates how to pass configuration to workers)
 
 ## Configuration
 
-**Scale**: 2 partitions per date × 5 weekdays (Jan 1-5, 2024) = 10 sessions
+See [`config.yaml`](config.yaml) for the complete orchestrator configuration. Key settings:
 
-**File**: [`config.yaml`](config.yaml)
+```yaml
+execution:
+  worker_script: "simple_worker_batch.py"
+  num_partitions: 2
+  max_concurrent_sessions: 10
+  heap_size_gb: 4.0
+  script_language: "Python"
 
-Key settings:
+batch:
+  timeout_minutes: 5
 
-- `batch.timeout_minutes: 5` - Maximum runtime for each batch query
-- `execution.heap_size_gb: 4.0` - Memory allocation per query
-- `execution.script_language: "Python"` - Worker script language
+dates:
+  start: "2024-01-01"
+  end: "2024-01-05"
+  weekdays_only: true         # Only Mon-Fri (5 weekdays in this range)
+```
+
+This creates 2 partitions per date × 5 weekdays = 10 total batch sessions.
 
 ## Running
 
-Set environment variables:
+From the `pq_orchestration` directory:
 
 ```bash
-export DH_CONNECTION_URL="https://your-server:8000/iris/connection.json"
-export DH_USERNAME="your_username"
-export DH_PASSWORD="your_password"
-```
-
-Run the orchestrator:
-
-```bash
-cd /path/to/pq_orchestration
 pq-orchestrator --config simple_worker_batch/config.yaml
 ```
 
 ## Output
 
-Each worker creates a `worker_status` table with:
+Each session prints to console:
 
-- Date processed
-- Partition ID
-- Status (COMPLETED)
-- Custom message from configuration
+- `SIMULATION_NAME`: The simulation identifier
+- `SIMULATION_DATE`: The date being processed
+- `dh_today()`: Comparison to verify date matches
+- `PARTITION_ID`: This partition's ID
+- `NUM_PARTITIONS`: Total number of partitions per date
+- `CUSTOM_MESSAGE`: The custom message from config
+- Status messages confirming execution
+
+The script also creates an in-memory table (`worker_status`) with the following columns:
+
+- `Date`: The simulation date
+- `PartitionID`: This partition's ID
+- `NumPartitions`: Total partitions per date
+- `Status`: Always "COMPLETED" in this example
+- `Message`: Descriptive message showing partition and date
+- `CustomMessage`: The custom message from config
+
+This table is **not published or persisted** - it's purely for demonstration purposes.
+
+## Verification
+
+After running, check the orchestrator console output to verify:
+
+- All 10 sessions (2 partitions × 5 weekdays) were created
+- Each session completed successfully
+- No failures reported
+- Exit code 0 (success)
 
 ## Files
 
