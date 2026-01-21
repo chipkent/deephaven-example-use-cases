@@ -1,6 +1,6 @@
 # Trading Simulation Batch Example
 
-Vectorized trading simulation using historical market data with batch mode orchestration.
+Vectorized trading simulation using historical market data with PQ orchestration in batch mode.
 
 ## Overview
 
@@ -84,10 +84,10 @@ See the [main README](../README.md) for setup instructions. This example require
 
 **2. Clean existing tables** - Run [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console and call `delete_all_tables()` to remove any previous simulation data.
 
-**3. Run** - From the `replay_orchestration` directory:
+**3. Run** - From the `pq_orchestration` directory:
 
 ```bash
-replay-orchestrator --config trading_simulation_batch/config.yaml
+pq-orchestrator --config trading_simulation_batch/config.yaml
 ```
 
 This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleBatchTradingSim` namespace. Tables are auto-created on first write.
@@ -103,7 +103,7 @@ export DH_PASSWORD="your_password"
 
 Run the orchestrator:
 ```bash
-replay-orchestrator --config trading_simulation_batch/config.yaml
+pq-orchestrator --config trading_simulation_batch/config.yaml
 ```
 
 Monitor progress in the console output. Press Ctrl+C to gracefully stop.

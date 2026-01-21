@@ -1,6 +1,6 @@
 # Trading Simulation Replay Example
 
-A market maker simulation based on mean-reversion strategy, designed to backtest trading algorithms across historical data using the replay orchestration framework with realistic time-based data arrival.
+A market maker simulation based on mean-reversion strategy, designed to backtest trading algorithms across historical data using the persistent query orchestration framework with realistic time-based data arrival.
 
 ## Overview
 
@@ -86,10 +86,10 @@ See the [main README](../README.md) for setup instructions. This example require
 
 **2. Clean existing tables** - Run [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console and call `delete_all_tables()` to remove any previous simulation data.
 
-**3. Run** - From the `replay_orchestration` directory:
+**3. Run** - From the `pq_orchestration` directory:
 
 ```bash
-replay-orchestrator --config trading_simulation_replay/config.yaml
+pq-orchestrator --config trading_simulation_replay/config.yaml
 ```
 
 This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleReplayTradingSim` namespace. Tables are auto-created on first write.

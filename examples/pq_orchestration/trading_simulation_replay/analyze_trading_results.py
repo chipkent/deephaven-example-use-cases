@@ -2,16 +2,16 @@
 Trading Simulation Results Analysis Script
 
 This script provides quantitative analysis functions for trading simulation results.
-Run this script in the Deephaven IDE console after the replay orchestration completes
+Run this script in the Deephaven IDE console after the PQ orchestration completes
 and the simulation output tables are available.
 
 HOW TO USE:
-    1. Run your trading simulation using the replay orchestrator
+    1. Run your trading simulation using the PQ orchestrator
     2. Wait for completion (check orchestrator logs)
     3. In Deephaven IDE console, run: exec(open('analyze_trading_results.py').read())
     4. Call analysis functions with your simulation name from config.yaml
 
-Expected Input Tables (created by trading simulation in ExampleBatchTradingSim namespace):
+Expected Input Tables (created by trading simulation in ExampleReplayTradingSim namespace):
     - TradingSimTrades: Individual trade executions
         Columns: Date, Timestamp, Sym, Price, Size, PartitionID, SimulationName
         Size is positive for buys, negative for sells
@@ -57,7 +57,7 @@ from deephaven import agg
 from deephaven.updateby import cum_sum, cum_max
 
 # Default namespace for output tables
-DEFAULT_NAMESPACE = "ExampleBatchTradingSim"
+DEFAULT_NAMESPACE = "ExampleReplayTradingSim"
 
 def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
     """
@@ -68,7 +68,7 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
     
     Args:
         simulation_name: Name of the simulation to analyze (from your config.yaml 'name' field)
-        output_namespace: Namespace where tables are stored (default: "ExampleBatchTradingSim")
+        output_namespace: Namespace where tables are stored (default: "ExampleReplayTradingSim")
         
     Returns:
         Dictionary containing four Deephaven tables, or None if an error occurs:
@@ -181,7 +181,7 @@ def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPA
     
     Args:
         simulation_name: Name of the simulation to analyze (from your config.yaml 'name' field)
-        output_namespace: Namespace where tables are stored (default: "ExampleBatchTradingSim")
+        output_namespace: Namespace where tables are stored (default: "ExampleReplayTradingSim")
         
     Returns:
         Dictionary containing five Deephaven tables, or None if an error occurs:
@@ -572,7 +572,7 @@ def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
     
     Args:
         simulation_name: Name of the simulation to analyze (from your config.yaml 'name' field)
-        output_namespace: Namespace where tables are stored (default: "ExampleBatchTradingSim")
+        output_namespace: Namespace where tables are stored (default: "ExampleReplayTradingSim")
         
     Returns:
         Dictionary containing eight items (3 raw tables + 5 summary tables), or None if error:

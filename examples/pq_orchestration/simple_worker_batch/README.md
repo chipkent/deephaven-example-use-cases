@@ -1,10 +1,10 @@
 # Simple Worker Batch Example
 
-A minimal batch mode example demonstrating the replay orchestrator framework with non-replay persistent queries.
+A minimal batch mode example demonstrating the persistent query orchestrator framework with batch persistent queries.
 
 ## Overview
 
-This example creates batch (RunAndDone) persistent queries that process historical data without replay functionality. It's designed to verify the batch orchestration infrastructure works correctly.
+This example creates batch (RunAndDone) persistent queries that process historical data without replay functionality. It's designed to verify the PQ orchestration infrastructure works correctly.
 
 ## What It Does
 
@@ -42,8 +42,8 @@ export DH_PASSWORD="your_password"
 Run the orchestrator:
 
 ```bash
-cd /path/to/replay_orchestration
-replay-orchestrator --config simple_worker_batch/config.yaml
+cd /path/to/pq_orchestration
+pq-orchestrator --config simple_worker_batch/config.yaml
 ```
 
 ## Output

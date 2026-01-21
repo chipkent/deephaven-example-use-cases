@@ -50,4 +50,4 @@ Execute [./market_maker.py](./market_maker.py) in a Deephaven Enterprise environ
 
 ## Backtesting
 
-For backtesting this strategy across historical data, see the [replay_orchestration trading_simulation example](../../replay_orchestration/trading_simulation/), which adapts this market maker implementation to run across multiple dates with parallel workers.
+For backtesting this strategy across historical data, see the [pq_orchestration trading_simulation example](../../pq_orchestration/trading_simulation_replay/), which adapts this market maker implementation to run across multiple dates with parallel workers.

@@ -1,7 +1,7 @@
 """
 Trading Simulation Worker - Batch Mode
 
-This worker script runs as a Deephaven persistent query launched by the replay orchestrator.
+This worker script runs as a Deephaven batch persistent query launched by the PQ orchestrator.
 It performs vectorized trading simulation on historical market data using static table operations.
 
 Key Responsibilities:

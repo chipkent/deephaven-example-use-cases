@@ -6,7 +6,7 @@ This script orchestrates the execution of persistent queries (replay or batch mo
 It creates and manages Deephaven Enterprise sessions based on a configuration file.
 
 Usage:
-    python replay_orchestrator.py --config simple_worker/config.yaml
+    python pq_orchestrator.py --config simple_worker/config.yaml
 """
 
 import argparse
@@ -58,7 +58,7 @@ DEFAULT_BUFFER_POOL_RATIO = 0.25  # Ratio of buffer pool to heap size
 DEFAULT_RESTART_USERS = 1  # Number of concurrent users for restart
 
 
-class ReplayOrchestrator:
+class PersistentQueryOrchestrator:
     """Orchestrates persistent query execution (replay or batch mode) across dates and partitions."""
     
     def __init__(self, config_path: str, dry_run: bool = False):
@@ -82,6 +82,7 @@ class ReplayOrchestrator:
         
         # Initialize instance variables
         self.session_mgr: Optional[SessionManager] = None
+        self.authenticated_user: Optional[str] = None
         self.sessions: Dict[Tuple[str, int], int] = {}  # (date, partition_id) -> serial
         self.failed_sessions: List[Tuple[str, int]] = []
         self.retry_counts: Dict[Tuple[str, int], int] = {}
@@ -498,7 +499,7 @@ class ReplayOrchestrator:
                     logger.debug(f"Could not delete session (may already be deleted): date={date}, partition={partition_id}, error={e}")
                     errors += 1
             except Exception as e:
-                logger.error(f"Error cleaning up session: date={date}, partition={partition_id}, error={e}")
+                logger.error(f"Error cleaning up session: date={date}, partition={partition_id}, error={e}", exc_info=True)
                 errors += 1
         
         logger.info(f"Cleanup complete: {stopped} stopped, {deleted} deleted, {errors} errors")
@@ -595,6 +596,7 @@ class ReplayOrchestrator:
             logger.info(f"Authenticating as user: {username}")
             try:
                 self.session_mgr.password(user=username, password=password)
+                self.authenticated_user = username
             except Exception as e:
                 # Don't log password in error message
                 logger.error(f"Authentication failed for user: {username}")
@@ -616,6 +618,8 @@ class ReplayOrchestrator:
             logger.info(f"Authenticating with private key: {key_path}")
             try:
                 self.session_mgr.private_key(str(key_path_obj))
+                # For private key auth, get authenticated user from session manager
+                self.authenticated_user = self.session_mgr.controller_client.get_user()
             except Exception as e:
                 logger.error(f"Private key authentication failed")
                 raise ValueError(f"Private key authentication failed") from e
@@ -623,7 +627,7 @@ class ReplayOrchestrator:
         else:
             raise ValueError(f"Unsupported auth_method: {auth_method}")
         
-        logger.info("Authentication successful")
+        logger.info(f"Authentication successful as: {self.authenticated_user}")
     
     def _load_worker_script_content(self):
         """Load and cache worker script content."""
@@ -665,7 +669,7 @@ class ReplayOrchestrator:
         config_msg.version = 1
         config_msg.configurationType = config_type
         config_msg.name = f"{mode_prefix}_{self.config['name']}_{date.replace('-', '')}_{partition_id}"
-        config_msg.owner = self.config['deephaven']['username']
+        config_msg.owner = self.authenticated_user
         config_msg.enabled = True
         config_msg.serverName = self.config['execution'].get('server_name', 'AutoQuery')
         config_msg.heapSizeGb = self.config['execution']['heap_size_gb']
@@ -845,6 +849,19 @@ class ReplayOrchestrator:
         
         try:
             config_msg = self._build_persistent_query_config(date, partition_id)
+            
+            # Debug: log critical fields to diagnose NullPointerException
+            logger.debug(f"PQ config - name: {config_msg.name}, owner: {config_msg.owner}, "
+                        f"type: {config_msg.configurationType}, server: {config_msg.serverName}, "
+                        f"heap: {config_msg.heapSizeGb}, language: {config_msg.scriptLanguage}, "
+                        f"scheduling items: {len(config_msg.scheduling)}")
+            logger.debug(f"PQ config - script length: {len(config_msg.scriptCode) if config_msg.scriptCode else 0}, "
+                        f"typeSpecificFields length: {len(config_msg.typeSpecificFieldsJson) if config_msg.typeSpecificFieldsJson else 0}, "
+                        f"env vars: {len(config_msg.extraEnvironmentVariables)}, "
+                        f"jvm args: {len(config_msg.extraJvmArguments)}")
+            if self.execution_mode == 'replay':
+                logger.debug(f"Replay fields JSON: {config_msg.typeSpecificFieldsJson}")
+            
             serial = self.session_mgr.controller_client.add_query(config_msg)
             
             logger.info(f"Session created: date={date}, partition={partition_id}, serial={serial}")
@@ -865,7 +882,8 @@ class ReplayOrchestrator:
         except Exception as e:
             logger.error(
                 f"Failed to create session (unexpected error): date={date}, partition={partition_id}, "
-                f"error={type(e).__name__}: {e}"
+                f"error={type(e).__name__}: {e}",
+                exc_info=True
             )
             return False, None
     
@@ -954,24 +972,24 @@ class ReplayOrchestrator:
                 exception_str = str(exception_details) if exception_details else ''
                 
                 # DEBUG: Log exception details and pattern matching
-                logger.warning(f"[DEBUG] Session failed: date={date}, partition={partition_id}, status={status_name}")
-                logger.warning(f"[DEBUG] Exception (first 1000 chars): {exception_str[:1000]}")
+                logger.debug(f"Session failed: date={date}, partition={partition_id}, status={status_name}")
+                logger.debug(f"Exception (first 1000 chars): {exception_str[:1000]}")
                 
                 has_resources_unavailable = 'ResourcesUnavailableException' in exception_str
                 has_unable_to_find = 'Unable to find available server' in exception_str
                 has_unable_to_determine = 'Unable to determine dispatcher' in exception_str
                 has_no_dispatcher_resources = 'No dispatcher resources available' in exception_str
                 
-                logger.warning(f"[DEBUG] Pattern checks: ResourcesUnavailableException={has_resources_unavailable}, "
-                              f"Unable to find available server={has_unable_to_find}, "
-                              f"Unable to determine dispatcher={has_unable_to_determine}, "
-                              f"No dispatcher resources available={has_no_dispatcher_resources}")
+                logger.debug(f"Pattern checks: ResourcesUnavailableException={has_resources_unavailable}, "
+                            f"Unable to find available server={has_unable_to_find}, "
+                            f"Unable to determine dispatcher={has_unable_to_determine}, "
+                            f"No dispatcher resources available={has_no_dispatcher_resources}")
                 
                 if exception_str and (has_resources_unavailable or has_unable_to_find or has_unable_to_determine or has_no_dispatcher_resources):
-                    logger.warning(f"[DEBUG] CLASSIFYING AS RESOURCE_UNAVAILABLE")
+                    logger.debug(f"Classifying as RESOURCE_UNAVAILABLE")
                     return 'resource_unavailable'
                 
-                logger.warning(f"[DEBUG] CLASSIFYING AS FAILED")
+                logger.debug(f"Classifying as FAILED")
                 return 'failed'
         else:
             # All non-terminal states: keep monitoring
@@ -1079,7 +1097,7 @@ class ReplayOrchestrator:
                 self.session_mgr.controller_client.delete_query(serial)
                 logger.info(f"Deleted PQ serial {serial} due to resource unavailability")
             except Exception as e:
-                logger.error(f"Failed to delete PQ serial {serial}: {e}")
+                logger.error(f"Failed to delete PQ serial {serial}: {e}", exc_info=True)
         
         # Remove from tracking
         self.sessions.pop(session_key, None)
@@ -1231,7 +1249,7 @@ class ReplayOrchestrator:
             except Exception as e:
                 failed_deletions += 1
                 date, partition_id = session_key
-                logger.warning(f"Failed to delete query: date={date}, partition={partition_id}, serial={serial}: {e}")
+                logger.warning(f"Failed to delete query: date={date}, partition={partition_id}, serial={serial}: {e}", exc_info=True)
         
         if deleted_successful > 0:
             logger.info(f"Deleted {deleted_successful} successful queries")
@@ -1439,7 +1457,7 @@ class ReplayOrchestrator:
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description='Orchestrate Deephaven Enterprise replay persistent queries'
+        description='Orchestrate Deephaven Enterprise persistent queries'
     )
     parser.add_argument(
         '--config',
@@ -1465,7 +1483,7 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
     
     try:
-        orchestrator = ReplayOrchestrator(args.config, dry_run=args.dry_run)
+        orchestrator = PersistentQueryOrchestrator(args.config, dry_run=args.dry_run)
         exit_code = orchestrator.run()
         sys.exit(exit_code)
         

@@ -1,4 +1,4 @@
-# Replay Orchestration Framework
+# Persistent Query Orchestration Framework
 
 A generic framework for orchestrating Deephaven Enterprise persistent queries across multiple dates with parallel partitions per date. Supports both **replay mode** (live data simulation) and **batch mode** (historical data processing).
 
@@ -67,10 +67,10 @@ The orchestrator creates and manages persistent queries based on a configuration
 ## Directory Structure
 
 ```text
-replay_orchestration/
+pq_orchestration/
 ├── README.md                        # This file
 ├── setup.py                         # Package setup with dependencies
-├── replay_orchestrator.py          # Generic orchestrator script
+├── pq_orchestrator.py              # Generic orchestrator script
 ├── simple_worker_replay/            # Minimal replay example
 │   ├── simple_worker.py
 │   ├── config.yaml
@@ -92,7 +92,7 @@ replay_orchestration/
 **Core Files**:
 
 - [`setup.py`](setup.py) - Package setup with Python version enforcement
-- [`replay_orchestrator.py`](replay_orchestrator.py) - Main orchestrator script (supports both modes)
+- [`pq_orchestrator.py`](pq_orchestrator.py) - Main orchestrator script (supports both modes)
 
 **Replay Examples**:
 
@@ -141,7 +141,7 @@ export DH_PASSWORD="your_password"
 **Test configuration first (recommended):**
 
 ```bash
-replay-orchestrator --config simple_worker/config.yaml --dry-run
+pq-orchestrator --config simple_worker/config.yaml --dry-run
 ```
 
 This validates your configuration without creating any sessions.
@@ -149,7 +149,7 @@ This validates your configuration without creating any sessions.
 **Run the orchestrator:**
 
 ```bash
-replay-orchestrator --config simple_worker/config.yaml
+pq-orchestrator --config simple_worker/config.yaml
 ```
 
 This will create 10 replay sessions (5 weekdays × 2 partitions per date). Monitor progress in the console output. Press Ctrl+C to gracefully stop (finishes current operations before exiting).
@@ -157,7 +157,7 @@ This will create 10 replay sessions (5 weekdays × 2 partitions per date). Monit
 ## Command-Line Options
 
 ```bash
-replay-orchestrator --config <path> [--dry-run] [--verbose]
+pq-orchestrator --config <path> [--dry-run] [--verbose]
 ```
 
 **Options:**
@@ -555,7 +555,7 @@ The orchestrator configures replay persistent queries with:
 Run with `--dry-run` first to catch configuration errors:
 
 ```bash
-python replay_orchestrator.py --config your_config.yaml --dry-run
+python pq_orchestrator.py --config your_config.yaml --dry-run
 ```
 
 Common validation errors:

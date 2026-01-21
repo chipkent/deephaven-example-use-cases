@@ -1,7 +1,7 @@
 """
 Trading Simulation Worker
 
-This worker script runs as a Deephaven persistent query launched by the replay orchestrator.
+This worker script runs as a Deephaven persistent query launched by the PQ orchestrator.
 It simulates a mean-reversion trading strategy using EMA-based predictions on replayed market data.
 
 Key Responsibilities:

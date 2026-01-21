@@ -1,6 +1,6 @@
 # Simple Worker Replay Example
 
-This is a minimal replay mode example to **verify the replay orchestration framework is working correctly**.
+This is a minimal replay mode example to **verify the persistent query orchestration framework is working correctly**.
 
 ## Purpose
 
@@ -56,10 +56,10 @@ This creates 2 partitions per date × 5 weekdays = 10 total replay sessions.
 
 ## Running
 
-From the `replay_orchestration` directory:
+From the `pq_orchestration` directory:
 
 ```bash
-replay-orchestrator --config simple_worker_replay/config.yaml
+pq-orchestrator --config simple_worker_replay/config.yaml
 ```
 
 ## Output

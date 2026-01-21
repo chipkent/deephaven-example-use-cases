@@ -2,7 +2,7 @@
 User Table Management Script for Trading Simulation
 
 This script is meant to be run in the Deephaven console to manage user tables
-created by the trading simulation batch orchestration.
+created by the trading simulation PQ orchestration.
 
 Functions:
 - delete_all_tables(output_namespace): Delete all trading simulation user tables
@@ -14,14 +14,16 @@ making create_empty_tables() unnecessary.
 """
 
 # Default namespace for output tables
-DEFAULT_NAMESPACE = "ExampleBatchTradingSim"
+DEFAULT_NAMESPACE = "ExampleReplayTradingSim"
 
-# Table names used by the trading simulation (batch mode creates 5 tables)
+# Table names used by the trading simulation
 TABLE_NAMES = [
     "TradingSimTrades",
     "TradingSimPositions",
     "TradingSimPnl",
     "TradingSimPreds",
+    "TradingSimOrders",
+    "TradingSimExecutions",
     "TradingSimSummary"
 ]
 
@@ -128,6 +130,8 @@ Table names:
   - TradingSimPositions
   - TradingSimPnl
   - TradingSimPreds
+  - TradingSimOrders
+  - TradingSimExecutions
   - TradingSimSummary
 
 Example usage:
