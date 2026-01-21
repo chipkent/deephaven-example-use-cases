@@ -9,6 +9,7 @@ This example demonstrates how to perform large-scale trading strategy backtests 
 ## What It Does
 
 Simulates a mean-reversion trading strategy on historical market data:
+
 1. Loads historical equity quote data for assigned symbols
 2. Computes EMA-based buy/sell predictions across all ticks
 3. Generates trades using vectorized logic with position tracking
@@ -18,12 +19,14 @@ Simulates a mean-reversion trading strategy on historical market data:
 ## Trading Logic
 
 **Vectorized Implementation**:
+
 - Uses `group_by().update(UDF).ungroup()` pattern
 - UDF processes all ticks for each symbol sequentially
 - Maintains position state across trades within the UDF
 - Returns array of trade sizes for all ticks
 
 **Strategy**:
+
 - **Buy signal**: Ask price < (EMA - StdDev)
 - **Sell signal**: Bid price > (EMA + StdDev)
 - **Position limits**: $10,000 maximum position value
@@ -32,6 +35,7 @@ Simulates a mean-reversion trading strategy on historical market data:
 ## Key Differences from Replay Version
 
 **Data Access**:
+
 ```python
 # Replay version
 ticks = db.live_table("FeedOS", "EquityQuoteL1")
@@ -42,10 +46,12 @@ ticks = db.historical_table("FeedOS", "EquityQuoteL1") \
 ```
 
 **Computation Model**:
+
 - Replay: Incremental processing as data ticks in
 - Batch: Vectorized processing of complete day's data
 
 **Termination**:
+
 - Replay: Manual `stop_and_wait()` call
 - Batch: Automatic termination via RunAndDone
 
@@ -56,6 +62,7 @@ ticks = db.historical_table("FeedOS", "EquityQuoteL1") \
 **File**: [`config.yaml`](config.yaml)
 
 Key settings:
+
 ```yaml
 execution:
   num_partitions: 2
@@ -150,6 +157,7 @@ def compute_trades(close_only, pred_buy, pred_sell, bid, ask, mid, trade_sizes):
 ```
 
 Applied via group_by with pre-computed close-out flag:
+
 ```python
 trades = preds \
     .update_view(["CloseOnly = Timestamp >= close_out_time"]) \
@@ -160,6 +168,7 @@ trades = preds \
 ```
 
 **Performance optimizations:**
+
 - **Numba JIT compilation**: [`@numba.guvectorize`](https://numba.pydata.org/numba-doc/latest/user/vectorize.html#the-guvectorize-decorator) compiles to optimized machine code
 - **Pre-computed close flag**: Boolean array avoids repeated timestamp comparisons
 - **Vectorized types**: Explicit type signatures enable SIMD optimizations

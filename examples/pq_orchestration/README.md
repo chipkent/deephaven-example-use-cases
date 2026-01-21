@@ -5,11 +5,13 @@ A generic framework for orchestrating Deephaven Enterprise persistent queries ac
 ## Execution Modes
 
 ### Replay Mode
+
 **What are replay persistent queries?** They allow you to run Deephaven queries against historical data as if it were live, making it possible to backtest strategies or reprocess data while maintaining the same code you'd use in production. See [Deephaven Replay Documentation](https://deephaven.io/enterprise/docs/deephaven-database/replayer/) for details.
 
 **Use cases**: Strategy backtesting with realistic data arrival, testing production code on historical periods, reprocessing data with time-aware logic.
 
 ### Batch Mode
+
 **What are batch persistent queries?** They process complete historical datasets using vectorized table operations, ideal for analytics and simulations that don't require time-based data arrival simulation.
 
 **Use cases**: Large-scale data analytics, Monte Carlo simulations, parameter sweeps, vectorized strategy backtests.
@@ -53,11 +55,13 @@ The orchestrator creates and manages persistent queries based on a configuration
 ## Use Cases
 
 ### Replay Mode
+
 - **Realistic strategy backtesting**: Test trading algorithms with realistic data arrival timing
 - **Production code validation**: Verify production queries work correctly on historical periods
 - **Time-aware reprocessing**: Reprocess data maintaining temporal relationships
 
 ### Batch Mode
+
 - **Vectorized backtesting**: Fast strategy evaluation on complete historical datasets
 - **Risk analysis**: Calculate risk metrics across multiple scenarios
 - **Data processing**: Process large datasets by partitioning work
@@ -143,6 +147,7 @@ export DH_PASSWORD="your_password"
 ### 3. Run a Simple Worker Example
 
 **Choose an example:**
+
 - **Replay mode**: [`simple_worker_replay/config.yaml`](simple_worker_replay/config.yaml) - demonstrates replay with time-based data arrival
 - **Batch mode**: [`simple_worker_batch/config.yaml`](simple_worker_batch/config.yaml) - demonstrates batch processing of complete datasets
 
@@ -452,12 +457,14 @@ process_data(date, my_stocks)
 ### Simple Worker Examples
 
 **Replay Mode**: [`simple_worker_replay/`](simple_worker_replay/)
+
 - Minimal example demonstrating replay mode with time-based data arrival simulation
 - Creates a status table to verify orchestration is working
 - **Scale**: 2 partitions per date × 5 weekdays = 10 sessions
 - See [`simple_worker_replay/README.md`](simple_worker_replay/README.md)
 
 **Batch Mode**: [`simple_worker_batch/`](simple_worker_batch/)
+
 - Minimal example demonstrating batch mode for processing complete datasets
 - Creates a status table to verify orchestration is working
 - **Scale**: 2 partitions per date × 5 weekdays = 10 sessions
@@ -466,6 +473,7 @@ process_data(date, my_stocks)
 ### Trading Simulation Examples
 
 **Replay Mode**: [`trading_simulation_replay/`](trading_simulation_replay/)
+
 - Mean-reversion trading strategy with realistic time-based data arrival
 - Processes historical market data as if it were live
 - **Scale**: 2 partitions per date × 250 trading days = 500 sessions
@@ -473,6 +481,7 @@ process_data(date, my_stocks)
 - See [`trading_simulation_replay/README.md`](trading_simulation_replay/README.md)
 
 **Batch Mode**: [`trading_simulation_batch/`](trading_simulation_batch/)
+
 - Vectorized trading strategy using batch processing
 - Processes complete historical datasets with optimized table operations
 - **Scale**: 2 partitions per date × 250 trading days = 500 sessions
