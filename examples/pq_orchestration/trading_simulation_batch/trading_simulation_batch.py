@@ -177,7 +177,7 @@ print(f"[INFO] Generated {trades.size} trades")
 positions = trades.view(["Sym", "Position=Size"]).sum_by("Sym")
 
 # Get final prices for PnL calculation
-final_prices = ticks_bid_ask.last_by("Sym").view(["Sym", "FinalBid=BidPrice", "FinalAsk=AskPrice", "FinalMid=MidPrice"])
+final_prices = ticks_bid_ask.last_by("Sym").view(["Sym", "FinalBid=BidPrice", "FinalAsk=AskPrice", "FinalMid=0.5*(BidPrice+AskPrice)"])
 
 pnl = trades \
     .natural_join(final_prices, on="Sym", joins=["FinalMid"]) \
@@ -222,12 +222,22 @@ def write_partitioned_tables():
     
     print(f"[INFO] Writing user tables for simulation: {simulation_name}")
     
-    # Partition key: SimulationName/Date/PartitionID
-    partition_key = f"{simulation_name}/{simulation_date}/{partition_id}"
+    # Partition key: SimulationName_Date_PartitionID
+    partition_key = f"{simulation_name}_{simulation_date}_{partition_id}"
     
     for table, table_name in tables_to_write:
         try:
             table_with_partitions = table.update_view(partition_updates)
+            
+            # Create table schema if it doesn't exist
+            try:
+                db.get_partitioned_table(output_namespace, table_name)
+            except:
+                # Table doesn't exist, create schema
+                # The prototype must NOT include the partitioning column
+                db.add_partitioned_table_schema(output_namespace, table_name, "PartitionKey", table_with_partitions)
+                print(f"[INFO] Created table schema: {table_name}")
+            
             db.add_table_partition(output_namespace, table_name, partition_key, table_with_partitions)
             print(f"[INFO] Wrote {table_name}")
         except Exception as e:
