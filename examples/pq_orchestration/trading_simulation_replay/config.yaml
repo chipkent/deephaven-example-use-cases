@@ -7,7 +7,7 @@ deephaven:
   password: "${DH_PASSWORD}"
   
 execution:
-  worker_script: "trading_simulation.py"
+  worker_script: "trading_simulation_replay.py"
   num_partitions: 2
   max_concurrent_sessions: 10
   heap_size_gb: 16.0

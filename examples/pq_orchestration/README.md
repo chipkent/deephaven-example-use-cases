@@ -76,7 +76,7 @@ pq_orchestration/
 ├── setup.py                                     # Package setup with dependencies
 ├── pq_orchestrator.py                          # Generic orchestrator script
 ├── simple_worker_replay/                        # Minimal replay example
-│   ├── simple_worker.py                         # Worker script
+│   ├── simple_worker_replay.py                  # Worker script
 │   ├── config.yaml                              # Configuration
 │   └── README.md                                # Documentation
 ├── simple_worker_batch/                         # Minimal batch example
@@ -84,7 +84,7 @@ pq_orchestration/
 │   ├── config.yaml                              # Configuration
 │   └── README.md                                # Documentation
 ├── trading_simulation_replay/                   # Trading replay example
-│   ├── trading_simulation.py                    # Worker script
+│   ├── trading_simulation_replay.py             # Worker script
 │   ├── analyze_trading_results.py               # Analysis tools
 │   ├── manage_user_tables.py                    # Table utilities
 │   ├── config.yaml                              # Configuration
@@ -605,7 +605,7 @@ ls -la /path/to/private_key
 
 Worker script path is **relative to the config file directory**, not the current working directory.
 
-Example: If config is at [`simple_worker_replay/config.yaml`](simple_worker_replay/config.yaml) and specifies `worker_script: "simple_worker.py"`, the script must be at [`simple_worker_replay/simple_worker.py`](simple_worker_replay/simple_worker.py).
+Example: If config is at [`simple_worker_replay/config.yaml`](simple_worker_replay/config.yaml) and specifies `worker_script: "simple_worker_replay.py"`, the script must be at [`simple_worker_replay/simple_worker_replay.py`](simple_worker_replay/simple_worker_replay.py).
 
 ### Session Creation Failures
 

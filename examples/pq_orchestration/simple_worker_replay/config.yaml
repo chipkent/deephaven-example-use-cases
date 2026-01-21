@@ -7,7 +7,7 @@ deephaven:
   password: "${DH_PASSWORD}"
   
 execution:
-  worker_script: "simple_worker.py"
+  worker_script: "simple_worker_replay.py"
   num_partitions: 2
   max_concurrent_sessions: 10
   heap_size_gb: 4.0

@@ -35,7 +35,7 @@ See [`config.yaml`](config.yaml) for the complete orchestrator configuration. Ke
 
 ```yaml
 execution:
-  worker_script: "simple_worker.py"  # Worker script file
+  worker_script: "simple_worker_replay.py"  # Worker script file
   num_partitions: 2
   max_concurrent_sessions: 10
   heap_size_gb: 4.0
@@ -96,6 +96,6 @@ After running, check the orchestrator console output to verify:
 
 ## Files
 
-- [`simple_worker.py`](simple_worker.py) - Worker script
+- [`simple_worker_replay.py`](simple_worker_replay.py) - Worker script
 - [`config.yaml`](config.yaml) - Replay configuration
 - [`README.md`](README.md) - This file

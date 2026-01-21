@@ -31,7 +31,7 @@ num_partitions = int(os.getenv("NUM_PARTITIONS"))  # 2 partitions per date
 my_symbols = all_symbols.where(f"Sym.hashCode() % {num_partitions} == {partition_id}")
 ```
 
-**Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in [`trading_simulation.py`](trading_simulation.py).
+**Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in [`trading_simulation_replay.py`](trading_simulation_replay.py).
 
 ### Configuration
 
@@ -240,7 +240,7 @@ See [`examples/finance/simulated_market_maker`](../../finance/simulated_market_m
 
 To adapt for your use case:
 
-1. **Change stock universe**: Modify the `all_symbols` table in [`trading_simulation.py`](trading_simulation.py)
+1. **Change stock universe**: Modify the `all_symbols` table in [`trading_simulation_replay.py`](trading_simulation_replay.py)
 2. **Adjust strategy parameters**: Update `MAX_POSITION_DOLLARS`, `EMA_DECAY_TIME`, `LOT_SIZE` in [`config.yaml`](config.yaml)
 3. **Scale partitions**: Increase `num_partitions` to process more symbols in parallel
 4. **Adjust date range**: Modify `dates.start` and `dates.end` in [`config.yaml`](config.yaml)
@@ -248,7 +248,7 @@ To adapt for your use case:
 
 ## Files
 
-- [`trading_simulation.py`](trading_simulation.py) - Replay worker script
+- [`trading_simulation_replay.py`](trading_simulation_replay.py) - Replay worker script
 - [`config.yaml`](config.yaml) - Replay configuration
 - [`manage_user_tables.py`](manage_user_tables.py) - Table management utilities
 - [`analyze_trading_results.py`](analyze_trading_results.py) - Performance analysis tools
