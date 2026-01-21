@@ -1153,20 +1153,36 @@ class PersistentQueryOrchestrator:
         """
         completed_count = 0
         failed_count = 0
+        processed_this_iteration = set()
         
         for session_key in list(active_sessions):
             status = self._check_session_status(session_key, pq_info_map)
             date, partition_id = session_key
+            serial = self.sessions.get(session_key)
             
             if status == 'completed':
+                if session_key in processed_this_iteration:
+                    logger.error(f"BUG DETECTED: Processing same session twice in one iteration: date={date}, partition={partition_id}, serial={serial}")
+                processed_this_iteration.add(session_key)
+                
+                logger.debug(f"Incrementing completed counter: date={date}, partition={partition_id}, serial={serial}")
                 active_sessions.remove(session_key)
                 completed_count += 1
                 self.retry_counts.pop(session_key, None)
                 logger.info(f"Session completed successfully: date={date}, partition={partition_id}")
             elif status == 'resource_unavailable':
+                if session_key in processed_this_iteration:
+                    logger.error(f"BUG DETECTED: Processing same session twice in one iteration: date={date}, partition={partition_id}, serial={serial}")
+                processed_this_iteration.add(session_key)
+                
                 active_sessions.remove(session_key)
                 self._handle_resource_unavailability(session_key, pending_tasks)
             elif status == 'failed':
+                if session_key in processed_this_iteration:
+                    logger.error(f"BUG DETECTED: Processing same session twice in one iteration: date={date}, partition={partition_id}, serial={serial}")
+                processed_this_iteration.add(session_key)
+                
+                logger.debug(f"Incrementing failed counter: date={date}, partition={partition_id}, serial={serial}")
                 active_sessions.remove(session_key)
                 failed_count += 1
                 self.failed_sessions.append(session_key)
@@ -1264,10 +1280,19 @@ class PersistentQueryOrchestrator:
         logger.info("=" * 80)
         logger.info("Orchestrator Complete")
         logger.info("=" * 80)
-        logger.info(f"Total sessions created: {created}")
+        logger.info(f"Total unique tasks: {total_tasks}")
+        logger.info(f"Creation attempts (including retries): {created}")
         logger.info(f"Successfully completed: {completed}")
         logger.info(f"Failed: {failed}")
-        logger.info(f"Creation failures: {total_tasks - created}")
+        
+        # Calculate creation failures from unique tasks
+        creation_failures = total_tasks - completed - failed
+        if creation_failures != 0:
+            if creation_failures < 0:
+                logger.warning(f"ACCOUNTING BUG: Creation failures is negative ({creation_failures}). "
+                              f"This means completed+failed ({completed}+{failed}={completed+failed}) > total_tasks ({total_tasks})")
+            else:
+                logger.info(f"Creation failures: {creation_failures}")
         
         if self.failed_sessions:
             logger.error("Failed sessions:")

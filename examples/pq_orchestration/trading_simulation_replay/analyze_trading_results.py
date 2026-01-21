@@ -47,7 +47,7 @@ Key Metrics Explained:
     - Turnover: Total dollar value traded (useful for transaction cost estimation)
 
 Quick Start Example:
-    sim_name = "trading_simulation"  # From your config.yaml
+    sim_name = "trading_simulation_replay"  # From your config.yaml
     summary = get_summary(sim_name)
     top_performers = summary["top_performers"]  # Assigns table to variable, displays in UI
 """
@@ -58,6 +58,9 @@ from deephaven.updateby import cum_sum, cum_max
 
 # Default namespace for output tables
 DEFAULT_NAMESPACE = "ExampleReplayTradingSim"
+
+# Default simulation name from config.yaml
+DEFAULT_SIMULATION_NAME = "trading_simulation_replay"
 
 def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
     """
@@ -106,21 +109,25 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
     print(f"[INFO] Analyzing P&L for simulation: {simulation_name}...")
     
     try:
-        pnl = db.get_partitioned_table(output_namespace, "TradingSimPnl") \
+        pnl = db.historical_table(output_namespace, "TradingSimPnl") \
             .where(f"SimulationName = `{simulation_name}`")
         
         # P&L by symbol with win/loss statistics
         pnl_by_symbol = pnl.update_view([
             "IsWin = PnL > 0",
-            "IsLoss = PnL < 0"
+            "IsLoss = PnL < 0",
+            "WinningDay = IsWin ? 1 : 0",
+            "LosingDay = IsLoss ? 1 : 0",
+            "WinPnL = IsWin ? PnL : 0",
+            "LossPnL = IsLoss ? PnL : 0"
         ]).agg_by([
             agg.sum_("TotalPnL=PnL"),
             agg.count_("TradingDays"),
-            agg.sum_("WinningDays=IsWin ? 1 : 0"),
-            agg.sum_("LosingDays=IsLoss ? 1 : 0"),
-            agg.avg_("AvgPnL=PnL"),
-            agg.avg_("AvgWin=IsWin ? PnL : null"),
-            agg.avg_("AvgLoss=IsLoss ? PnL : null")
+            agg.sum_("WinningDays=WinningDay"),
+            agg.sum_("LosingDays=LosingDay"),
+            agg.avg("AvgPnL=PnL"),
+            agg.avg("AvgWin=WinPnL"),
+            agg.avg("AvgLoss=LossPnL")
         ], by=["Sym"]) \
         .update_view("WinRate = WinningDays / (double)(WinningDays + LosingDays)") \
         .sort_descending("TotalPnL")
@@ -128,7 +135,7 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         # Daily P&L with cumulative
         pnl_by_date = pnl.agg_by([
             agg.sum_("DailyPnL=PnL"),
-            agg.count_distinct_("SymbolCount=Sym")
+            agg.count_distinct("SymbolCount=Sym")
         ], by=["Date"]) \
         .sort("Date") \
         .update_by(ops=cum_sum(cols=["CumulativePnL=DailyPnL"]))
@@ -136,14 +143,14 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         # Overall statistics with risk metrics
         daily_pnl_for_stats = pnl.agg_by([agg.sum_("DailyPnL=PnL")], by=["Date"])
         
-        total_pnl = daily_pnl_for_stats.agg_by([
+        total_pnl = daily_pnl_for_stats.update_view("WinningDay = DailyPnL > 0 ? 1 : 0").agg_by([
             agg.sum_("TotalPnL=DailyPnL"),
-            agg.avg_("AvgDailyPnL=DailyPnL"),
-            agg.std_("StdDevDaily=DailyPnL"),
+            agg.avg("AvgDailyPnL=DailyPnL"),
+            agg.std("StdDevDaily=DailyPnL"),
             agg.min_("MinDailyPnL=DailyPnL"),
             agg.max_("MaxDailyPnL=DailyPnL"),
             agg.count_("TradingDays"),
-            agg.sum_("WinningDays=DailyPnL > 0 ? 1 : 0")
+            agg.sum_("WinningDays=WinningDay")
         ]).update_view([
             "WinRate = WinningDays / (double)TradingDays",
             "SharpeRatio = StdDevDaily > 0 ? (AvgDailyPnL / StdDevDaily) * sqrt(252.0) : 0.0"
@@ -156,8 +163,8 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         
         max_drawdown_table = pnl_with_dd.agg_by([agg.min_("MaxDrawdown=Drawdown")])
         
-        # Join max drawdown into overall stats
-        total_pnl = total_pnl.natural_join(max_drawdown_table)
+        # Join max drawdown into overall stats (both are single-row tables)
+        total_pnl = total_pnl.join(table=max_drawdown_table, on=[])
         
         print(f"[INFO] P&L Analysis Complete")
         
@@ -170,7 +177,7 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         
     except Exception as e:
         print(f"[ERROR] Failed to analyze P&L: {e}")
-        return None
+        raise
 
 def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
     """
@@ -216,15 +223,16 @@ def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPA
     print(f"[INFO] Analyzing trades for simulation: {simulation_name}...")
     
     try:
-        trades = db.get_partitioned_table(output_namespace, "TradingSimTrades") \
-            .where(f"SimulationName = `{simulation_name}`")
+        trades = db.historical_table(output_namespace, "TradingSimTrades") \
+            .where(f"SimulationName = `{simulation_name}`") \
+            .update_view(["AbsSize = abs(Size)", "Turnover = AbsSize * Price"])
         
         # Trade statistics by symbol with net position tracking
         trades_by_symbol = trades.agg_by([
             agg.count_("TradeCount"),
-            agg.sum_("TotalShares=abs(Size)"),
+            agg.sum_("TotalShares=AbsSize"),
             agg.sum_("NetShares=Size"),
-            agg.avg_("AvgPrice=Price"),
+            agg.avg("AvgPrice=Price"),
             agg.min_("MinPrice=Price"),
             agg.max_("MaxPrice=Price")
         ], by=["Sym"]) \
@@ -234,9 +242,9 @@ def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPA
         # Trade statistics by date with turnover
         trades_by_date = trades.agg_by([
             agg.count_("TradeCount"),
-            agg.sum_("Volume=abs(Size)"),
-            agg.count_distinct_("UniqueSymbols=Sym"),
-            agg.sum_("Turnover=abs(Size) * Price")
+            agg.sum_("Volume=AbsSize"),
+            agg.count_distinct("UniqueSymbols=Sym"),
+            agg.sum_("Turnover")
         ], by=["Date"]) \
         .sort("Date")
         
@@ -244,15 +252,15 @@ def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPA
         trades_with_side = trades.update_view("Side = Size > 0 ? `BUY` : `SELL`")
         trades_by_side = trades_with_side.agg_by([
             agg.count_("TradeCount"),
-            agg.sum_("TotalShares=abs(Size)")
+            agg.sum_("TotalShares=AbsSize")
         ], by=["Side"])
         
         # Overall statistics
         overall_stats = trades.agg_by([
             agg.count_("TotalTrades"),
-            agg.sum_("TotalShares=abs(Size)"),
-            agg.count_distinct_("UniqueSymbols=Sym"),
-            agg.count_distinct_("TradingDays=Date")
+            agg.sum_("TotalShares=AbsSize"),
+            agg.count_distinct("UniqueSymbols=Sym"),
+            agg.count_distinct("TradingDays=Date")
         ])
         
         print(f"[INFO] Trade Analysis Complete")
@@ -267,7 +275,7 @@ def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPA
         
     except Exception as e:
         print(f"[ERROR] Failed to analyze trades: {e}")
-        return None
+        raise
 
 def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
     """
@@ -296,13 +304,13 @@ def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str =
     
     try:
         # Get all tables for this symbol and simulation
-        trades = db.get_partitioned_table(output_namespace, "TradingSimTrades") \
+        trades = db.historical_table(output_namespace, "TradingSimTrades") \
             .where([f"SimulationName = `{simulation_name}`", f"Sym = `{symbol}`"])
         
-        pnl = db.get_partitioned_table(output_namespace, "TradingSimPnl") \
+        pnl = db.historical_table(output_namespace, "TradingSimPnl") \
             .where([f"SimulationName = `{simulation_name}`", f"Sym = `{symbol}`"])
         
-        positions = db.get_partitioned_table(output_namespace, "TradingSimPositions") \
+        positions = db.historical_table(output_namespace, "TradingSimPositions") \
             .where([f"SimulationName = `{simulation_name}`", f"Sym = `{symbol}`"])
         
         # Trade timeline
@@ -320,13 +328,13 @@ def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str =
         # Statistics with win/loss analysis and risk metrics
         pnl_stats = pnl.update_view([
             "IsWin = PnL > 0",
-            "IsLoss = PnL < 0"
+            "WinningDay = IsWin ? 1 : 0"
         ]).agg_by([
             agg.sum_("TotalPnL=PnL"),
             agg.count_("TradingDays"),
-            agg.sum_("WinningDays=IsWin ? 1 : 0"),
-            agg.avg_("AvgDailyPnL=PnL"),
-            agg.std_("StdDevPnL=PnL")
+            agg.sum_("WinningDays=WinningDay"),
+            agg.avg("AvgDailyPnL=PnL"),
+            agg.std("StdDevPnL=PnL")
         ]).update_view([
             "WinRate = WinningDays / (double)TradingDays",
             "SharpeRatio = StdDevPnL > 0 ? (AvgDailyPnL / StdDevPnL) * sqrt(252.0) : 0.0"
@@ -335,11 +343,11 @@ def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str =
         trade_stats = trades.agg_by([
             agg.count_("TotalTrades"),
             agg.sum_("NetShares=Size"),
-            agg.avg_("AvgPrice=Price")
+            agg.avg("AvgPrice=Price")
         ])
         
-        # Combine trade and P&L stats
-        stats = trade_stats.natural_join(pnl_stats)
+        # Combine trade and P&L stats (both are single-row tables)
+        stats = trade_stats.join(table=pnl_stats, on=[])
         
         # Add cumulative P&L to daily_pnl
         daily_pnl_with_cumsum = daily_pnl.update_by(ops=cum_sum(cols=["CumulativePnL=PnL"]))
@@ -358,7 +366,7 @@ def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str =
         
     except Exception as e:
         print(f"[ERROR] Failed to analyze symbol {symbol}: {e}")
-        return None
+        raise
 
 def analyze_by_date(simulation_name: str, date: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
     """
@@ -385,16 +393,17 @@ def analyze_by_date(simulation_name: str, date: str, output_namespace: str = DEF
     
     try:
         # Get all tables for this date and simulation
-        trades = db.get_partitioned_table(output_namespace, "TradingSimTrades") \
-            .where([f"SimulationName = `{simulation_name}`", f"Date = `{date}`"])
+        trades = db.historical_table(output_namespace, "TradingSimTrades") \
+            .where([f"SimulationName = `{simulation_name}`", f"Date = `{date}`"]) \
+            .update_view("AbsSize = abs(Size)")
         
-        pnl = db.get_partitioned_table(output_namespace, "TradingSimPnl") \
+        pnl = db.historical_table(output_namespace, "TradingSimPnl") \
             .where([f"SimulationName = `{simulation_name}`", f"Date = `{date}`"])
         
         # Trade activity by symbol
         trades_by_symbol = trades.agg_by([
             agg.count_("TradeCount"),
-            agg.sum_("TotalShares=abs(Size)")
+            agg.sum_("TotalShares=AbsSize")
         ], by=["Sym"]) \
         .sort_descending("TradeCount")
         
@@ -409,13 +418,13 @@ def analyze_by_date(simulation_name: str, date: str, output_namespace: str = DEF
         # Statistics
         stats = trades.agg_by([
             agg.count_("TotalTrades"),
-            agg.count_distinct_("UniqueSymbols=Sym"),
+            agg.count_distinct("UniqueSymbols=Sym"),
             agg.sum_("NetShares=Size")
         ])
         
         pnl_stats = pnl.agg_by([
             agg.sum_("TotalPnL=PnL"),
-            agg.avg_("AvgPnL=PnL")
+            agg.avg("AvgPnL=PnL")
         ])
         
         print(f"[INFO] Date {date} Analysis Complete")
@@ -432,7 +441,7 @@ def analyze_by_date(simulation_name: str, date: str, output_namespace: str = DEF
         
     except Exception as e:
         print(f"[ERROR] Failed to analyze date {date}: {e}")
-        return None
+        raise
 
 def analyze_positions(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
     """
@@ -455,7 +464,7 @@ def analyze_positions(simulation_name: str, output_namespace: str = DEFAULT_NAME
     print(f"[INFO] Analyzing positions for simulation: {simulation_name}...")
     
     try:
-        positions = db.get_partitioned_table(output_namespace, "TradingSimPositions") \
+        positions = db.historical_table(output_namespace, "TradingSimPositions") \
             .where(f"SimulationName = `{simulation_name}`")
         
         # Final positions by symbol
@@ -467,7 +476,7 @@ def analyze_positions(simulation_name: str, output_namespace: str = DEFAULT_NAME
         
         # Position statistics
         position_stats = positions.agg_by([
-            agg.avg_("AvgPosition=Position"),
+            agg.avg("AvgPosition=Position"),
             agg.min_("MinPosition=Position"),
             agg.max_("MaxPosition=Position"),
             agg.count_("Observations")
@@ -477,8 +486,8 @@ def analyze_positions(simulation_name: str, output_namespace: str = DEFAULT_NAME
         
         # Overall statistics
         overall_stats = positions.agg_by([
-            agg.count_distinct_("UniqueSymbols=Sym"),
-            agg.avg_("AvgPosition=abs(Position)"),
+            agg.count_distinct("UniqueSymbols=Sym"),
+            agg.avg("AvgPosition=abs(Position)"),
             agg.max_("MaxPosition=abs(Position)")
         ])
         
@@ -493,7 +502,7 @@ def analyze_positions(simulation_name: str, output_namespace: str = DEFAULT_NAME
         
     except Exception as e:
         print(f"[ERROR] Failed to analyze positions: {e}")
-        return None
+        raise
 
 def analyze_executions(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
     """
@@ -517,7 +526,7 @@ def analyze_executions(simulation_name: str, output_namespace: str = DEFAULT_NAM
     print(f"[INFO] Analyzing executions for simulation: {simulation_name}...")
     
     try:
-        executions = db.get_partitioned_table(output_namespace, "TradingSimExecutions") \
+        executions = db.historical_table(output_namespace, "TradingSimExecutions") \
             .where(f"SimulationName = `{simulation_name}`")
         
         # Action counts
@@ -527,26 +536,30 @@ def analyze_executions(simulation_name: str, output_namespace: str = DEFAULT_NAM
         .sort_descending("ActionCount")
         
         # Actions by symbol
-        actions_by_symbol = executions.agg_by([
+        actions_by_symbol = executions.update_view([
+            "IsBuy = Action == `BUY` ? 1 : 0",
+            "IsSell = Action == `SELL` ? 1 : 0",
+            "IsNoTrade = Action == `NO_TRADE` ? 1 : 0"
+        ]).agg_by([
             agg.count_("TotalActions"),
-            agg.sum_("BuyActions=Action == `BUY` ? 1 : 0"),
-            agg.sum_("SellActions=Action == `SELL` ? 1 : 0"),
-            agg.sum_("NoTradeActions=Action == `NO_TRADE` ? 1 : 0")
+            agg.sum_("BuyActions=IsBuy"),
+            agg.sum_("SellActions=IsSell"),
+            agg.sum_("NoTradeActions=IsNoTrade")
         ], by=["Sym"]) \
         .sort_descending("TotalActions")
         
         # Actions by date
         actions_by_date = executions.agg_by([
             agg.count_("TotalActions"),
-            agg.count_distinct_("UniqueSymbols=Sym")
+            agg.count_distinct("UniqueSymbols=Sym")
         ], by=["Date"]) \
         .sort("Date")
         
         # Overall statistics
         overall_stats = executions.agg_by([
             agg.count_("TotalExecutions"),
-            agg.count_distinct_("UniqueDates=Date"),
-            agg.count_distinct_("UniqueSymbols=Sym")
+            agg.count_distinct("UniqueDates=Date"),
+            agg.count_distinct("UniqueSymbols=Sym")
         ])
         
         print(f"[INFO] Execution Analysis Complete")
@@ -561,7 +574,7 @@ def analyze_executions(simulation_name: str, output_namespace: str = DEFAULT_NAM
         
     except Exception as e:
         print(f"[ERROR] Failed to analyze executions: {e}")
-        return None
+        raise
 
 def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
     """
@@ -613,25 +626,26 @@ def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
     
     try:
         # Get basic stats from each table for this simulation
-        trades = db.get_partitioned_table(output_namespace, "TradingSimTrades") \
+        trades = db.historical_table(output_namespace, "TradingSimTrades") \
+            .where(f"SimulationName = `{simulation_name}`") \
+            .update_view("AbsSize = abs(Size)")
+        pnl = db.historical_table(output_namespace, "TradingSimPnl") \
             .where(f"SimulationName = `{simulation_name}`")
-        pnl = db.get_partitioned_table(output_namespace, "TradingSimPnl") \
-            .where(f"SimulationName = `{simulation_name}`")
-        summary = db.get_partitioned_table(output_namespace, "TradingSimSummary") \
+        summary = db.historical_table(output_namespace, "TradingSimSummary") \
             .where(f"SimulationName = `{simulation_name}`")
         
         # Trade statistics
         trade_stats = trades.agg_by([
             agg.count_("TotalTrades"),
-            agg.sum_("TotalShares=abs(Size)"),
-            agg.count_distinct_("UniqueSymbols=Sym"),
-            agg.count_distinct_("TradingDays=Date")
+            agg.sum_("TotalShares=AbsSize"),
+            agg.count_distinct("UniqueSymbols=Sym"),
+            agg.count_distinct("TradingDays=Date")
         ])
         
         # P&L statistics
         pnl_stats = pnl.agg_by([
             agg.sum_("TotalPnL=PnL"),
-            agg.avg_("AvgPnL=PnL"),
+            agg.avg("AvgPnL=PnL"),
             agg.min_("MinPnL=PnL"),
             agg.max_("MaxPnL=PnL")
         ])
@@ -640,7 +654,7 @@ def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         summary_stats = summary.agg_by([
             agg.sum_("TotalTrades=TradeCount"),
             agg.sum_("TotalShares"),
-            agg.count_distinct_("UniqueSymbols=Sym")
+            agg.count_distinct("UniqueSymbols=Sym")
         ])
         
         # Top performers
@@ -668,7 +682,7 @@ def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         
     except Exception as e:
         print(f"[ERROR] Failed to generate summary: {e}")
-        return None
+        raise
 
 # Print usage on load
 print(f"""
@@ -677,7 +691,7 @@ Trading Simulation Results Analysis
 ================================================================================
 
 QUICK START:
-  1. Set your simulation name: sim_name = "trading_simulation"
+  1. Set your simulation name: sim_name = "trading_simulation_replay"  # or use DEFAULT_SIMULATION_NAME
   2. Get overview: summary = get_summary(sim_name)
   3. View results: summary["top_performers"]  # Displays in UI
 
@@ -705,28 +719,28 @@ Default namespace: "{DEFAULT_NAMESPACE}"
 
 EXAMPLE WORKFLOW:
 
-  # Step 1: Get your simulation name from config.yaml
-  sim_name = "trading_simulation"
-  
-  # Step 2: Start with high-level summary
-  summary = get_summary(sim_name)
-  winners = summary["top_performers"]       # See best stocks
-  losers = summary["bottom_performers"]     # See worst stocks
-  
-  # Step 3: Analyze overall performance
-  pnl = analyze_pnl(sim_name)
-  overall = pnl["overall"]                  # Sharpe, drawdown, win rate
-  by_date = pnl["by_date"]                  # Equity curve over time
-  
-  # Step 4: Investigate specific stocks
-  aapl = analyze_by_symbol(sim_name, "AAPL")
-  aapl_stats = aapl["stats"]                # Performance summary
-  aapl_equity = aapl["daily_pnl"]           # P&L evolution
-  
-  # Step 5: Analyze trading patterns
-  trades = analyze_trades(sim_name)
-  turnover = trades["by_date"]              # Daily costs
-  buy_sell = trades["by_side"]              # Direction bias
+# Step 1: Get your simulation name from config.yaml
+sim_name = DEFAULT_SIMULATION_NAME  # or "trading_simulation_replay"
+
+# Step 2: Start with high-level summary
+summary = get_summary(sim_name)
+winners = summary["top_performers"]       # See best stocks
+losers = summary["bottom_performers"]     # See worst stocks
+
+# Step 3: Analyze overall performance
+pnl = analyze_pnl(sim_name)
+overall = pnl["overall"]                  # Sharpe, drawdown, win rate
+by_date = pnl["by_date"]                  # Equity curve over time
+
+# Step 4: Investigate specific stocks
+aapl = analyze_by_symbol(sim_name, "AAPL")
+aapl_stats = aapl["stats"]                # Performance summary
+aapl_equity = aapl["daily_pnl"]           # P&L evolution
+
+# Step 5: Analyze trading patterns
+trades = analyze_trades(sim_name)
+turnover = trades["by_date"]              # Daily costs
+buy_sell = trades["by_side"]              # Direction bias
 
 For detailed help, see the module docstring at the top of this file.
 
