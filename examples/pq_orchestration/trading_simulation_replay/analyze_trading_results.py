@@ -121,8 +121,8 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
             "IsLoss = PnL < 0",
             "WinningDay = IsWin ? 1 : 0",
             "LosingDay = IsLoss ? 1 : 0",
-            "WinPnL = IsWin ? PnL : 0",
-            "LossPnL = IsLoss ? PnL : 0"
+            "WinPnL = IsWin ? PnL : NULL_DOUBLE",
+            "LossPnL = IsLoss ? PnL : NULL_DOUBLE"
         ]).agg_by([
             agg.sum_("TotalPnL=PnL"),
             agg.count_("TradingDays"),
