@@ -55,6 +55,7 @@ Quick Start Example:
 from typing import Dict, Optional, Any
 from deephaven import agg
 from deephaven.updateby import cum_sum, cum_max
+from deephaven.plot.figure import Figure
 
 # Default namespace for output tables
 DEFAULT_NAMESPACE = "ExampleReplayTradingSim"
@@ -99,6 +100,8 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
             * SharpeRatio: Risk-adjusted return (annualized). >1 is good, >2 is excellent
             * MaxDrawdown: Worst peak-to-trough decline. More negative = worse
             * WinRate: Percentage of profitable days (0.5 = 50%)
+        
+        - "by_date_plot": Plot of cumulative P&L over time (equity curve)
     
     Example:
         result = analyze_pnl("my_simulation")
@@ -137,7 +140,7 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
             agg.sum_("DailyPnL=PnL"),
             agg.count_distinct("SymbolCount=Sym")
         ], by=["Date"]) \
-        .sort("Date") \
+        .sort(["Date"]) \
         .update_by(ops=cum_sum(cols=["CumulativePnL=DailyPnL"]))
         
         # Overall statistics with risk metrics
@@ -166,12 +169,23 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         # Join max drawdown into overall stats (both are single-row tables)
         total_pnl = total_pnl.join(table=max_drawdown_table, on=[])
         
-        print(f"[INFO] P&L Analysis Complete")
+        # Create cumulative P&L plot for by_date
+        # Convert Date string to Instant for plotting (use NY timezone for market dates)
+        pnl_by_date_for_plot = pnl_by_date.update("DateInstant = parseInstant(Date + `T16:00:00 ET`)")
+        by_date_plot = Figure().plot_xy(
+            series_name="Cumulative P&L",
+            t=pnl_by_date_for_plot,
+            x="DateInstant",
+            y="CumulativePnL"
+        ).show()
+        
+        print(f"[INFO] P&L Analysis Complete (with cumulative P&L plot)")
         
         return {
             "pnl": pnl,
             "by_symbol": pnl_by_symbol,
             "by_date": pnl_by_date,
+            "by_date_plot": by_date_plot,
             "overall": total_pnl
         }
         
@@ -246,7 +260,7 @@ def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPA
             agg.count_distinct("UniqueSymbols=Sym"),
             agg.sum_("Turnover")
         ], by=["Date"]) \
-        .sort("Date")
+        .sort(["Date"])
         
         # Buy vs Sell analysis
         trades_with_side = trades.update_view("Side = Size > 0 ? `BUY` : `SELL`")
@@ -318,12 +332,14 @@ def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str =
             .view(["Date", "Timestamp", "Price", "Size"])
         
         # Daily P&L
+        #TODO: remove the select() call once the issue is fixed (https://deephaven.atlassian.net/browse/DH-21462)
         daily_pnl = pnl.view(["Date", "Sym", "PnL"]) \
-            .sort("Date")
+            .select() \
+            .sort(["Date"])
         
         # Position history
         position_history = positions.view(["Sym", "Position"]) \
-            .sort("Sym")
+            .sort(["Sym"])
         
         # Statistics with win/loss analysis and risk metrics
         pnl_stats = pnl.update_view([
@@ -412,7 +428,7 @@ def analyze_by_date(simulation_name: str, date: str, output_namespace: str = DEF
             .sort_descending("PnL")
         
         # Trade timeline
-        trade_timeline = trades.sort("Timestamp") \
+        trade_timeline = trades.sort(["Timestamp"]) \
             .view(["Timestamp", "Sym", "Price", "Size"])
         
         # Statistics
@@ -553,7 +569,7 @@ def analyze_executions(simulation_name: str, output_namespace: str = DEFAULT_NAM
             agg.count_("TotalActions"),
             agg.count_distinct("UniqueSymbols=Sym")
         ], by=["Date"]) \
-        .sort("Date")
+        .sort(["Date"])
         
         # Overall statistics
         overall_stats = executions.agg_by([
@@ -664,7 +680,7 @@ def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         
         # Bottom performers
         bottom_pnl = pnl.agg_by([agg.sum_("TotalPnL=PnL")], by=["Sym"]) \
-            .sort("TotalPnL") \
+            .sort(["TotalPnL"]) \
             .head(5)
         
         print(f"[INFO] Summary generation complete")
@@ -731,6 +747,7 @@ losers = summary["bottom_performers"]     # See worst stocks
 pnl = analyze_pnl(sim_name)
 overall = pnl["overall"]                  # Sharpe, drawdown, win rate
 by_date = pnl["by_date"]                  # Equity curve over time
+by_date_plot = pnl["by_date_plot"]        # Cumulative P&L plot
 
 # Step 4: Investigate specific stocks
 aapl = analyze_by_symbol(sim_name, "AAPL")
