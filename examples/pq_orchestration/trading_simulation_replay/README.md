@@ -52,12 +52,12 @@ replay:
 dates:
   start: "2024-01-01"
   end: "2024-01-31"
-  weekdays_only: true          # 250 trading days
+  weekdays_only: true          # 23 trading days in Jan 2024
 ```
 
-This creates **2 partitions per date × 250 days = 500 total replay sessions**.
+This creates **2 partitions per date × 23 days (Jan 2024) = 46 total replay sessions**.
 
-**Note**: For larger-scale backtesting, increase `num_partitions` (e.g., to 10 for 2,500 sessions) and adjust `max_concurrent_sessions` based on your server capacity.
+**Note**: To backtest a full year, expand the date range (e.g., `end: "2024-12-31"`) which would create ~500 sessions (2 partitions × ~250 trading days). You can also increase `num_partitions` for more parallel processing.
 
 ### Environment Variables
 
@@ -96,7 +96,7 @@ pq-orchestrator --config trading_simulation_replay/cleanup.yaml
 pq-orchestrator --config trading_simulation_replay/config.yaml
 ```
 
-This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleReplayTradingSim` namespace. Tables are auto-created on first write.
+This creates 46 sessions (2 partitions × 23 trading days in Jan 2024) and writes results to partitioned user tables in the `ExampleReplayTradingSim` namespace. Tables are auto-created on first write.
 
 ## Output Tables
 
@@ -190,8 +190,8 @@ This will delete all 7 tables created by the replay simulation:
 
 After completion, you'll have:
 
-- Historical trades across a full year (250 trading days)
-- 500 total sessions (2 partitions × 250 days)
+- Historical trades across January 2024 (23 trading days)
+- 46 total sessions (2 partitions × 23 days)
 - Trades partitioned by date and partition
 - Daily PnL by symbol
 - Position history

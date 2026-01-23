@@ -476,7 +476,7 @@ process_data(date, my_stocks)
 
 - Mean-reversion trading strategy with realistic time-based data arrival
 - Processes historical market data as if it were live
-- **Scale**: 2 partitions per date × 250 trading days = 500 sessions
+- **Scale**: 2 partitions per date × 23 trading days (Jan 2024) = 46 sessions
 - Based on [`examples/finance/simulated_market_maker`](../finance/simulated_market_maker)
 - See [`trading_simulation_replay/README.md`](trading_simulation_replay/README.md)
 
@@ -484,7 +484,7 @@ process_data(date, my_stocks)
 
 - Vectorized trading strategy using batch processing
 - Processes complete historical datasets with optimized table operations
-- **Scale**: 2 partitions per date × 250 trading days = 500 sessions
+- **Scale**: 2 partitions per date × 23 trading days (Jan 2024) = 46 sessions
 - Uses numba-optimized UDF for high-performance computation
 - See [`trading_simulation_batch/README.md`](trading_simulation_batch/README.md)
 

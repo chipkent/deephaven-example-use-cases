@@ -57,7 +57,9 @@ ticks = db.historical_table("FeedOS", "EquityQuoteL1") \
 
 ## Configuration
 
-**Scale**: 2 partitions per date × 250 trading days = 500 sessions
+**Scale**: 2 partitions per date × 23 trading days (Jan 2024) = 46 sessions
+
+**Note**: To backtest a full year, expand the date range (e.g., `end: "2024-12-31"`) which would create ~500 sessions (2 partitions × ~250 trading days).
 
 **File**: [`config.yaml`](config.yaml)
 
@@ -105,7 +107,7 @@ export DH_PASSWORD="your_password"
 pq-orchestrator --config trading_simulation_batch/config.yaml
 ```
 
-This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleBatchTradingSim` namespace. Tables are auto-created on first write. Monitor progress in the console output. Press Ctrl+C to gracefully stop.
+This creates 46 sessions (2 partitions × 23 trading days in Jan 2024) and writes results to partitioned user tables in the `ExampleBatchTradingSim` namespace. Tables are auto-created on first write. Monitor progress in the console output. Press Ctrl+C to gracefully stop.
 
 ## Output Tables
 
@@ -260,8 +262,8 @@ This will delete all 5 tables created by the batch simulation:
 
 After completion, you'll have:
 
-- Historical trades across a full year (250 trading days)
-- 500 total sessions (2 partitions × 250 days)
+- Historical trades across January 2024 (23 trading days)
+- 46 total sessions (2 partitions × 23 days)
 - Trades partitioned by date and partition
 - Daily PnL by symbol
 - Position history
