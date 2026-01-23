@@ -74,18 +74,34 @@ all_symbols = new_table([
 my_symbols = all_symbols.where(f"Sym.hashCode() % {num_partitions} == {partition_id}")
 
 print(f"[INFO] This partition handles {my_symbols.size} symbols")
+if my_symbols.size > 0:
+    print(f"[INFO] Symbols for partition {partition_id}: {my_symbols.view(['Sym']).to_string()}")
+else:
+    print(f"[WARNING] Partition {partition_id} has ZERO symbols assigned - all tables will be empty!")
 
 ############################################################################################################
 # Get historical market data
 ############################################################################################################
 
-ticks_bid_ask = db.historical_table("FeedOS", "EquityQuoteL1") \
-    .where([f"Date == '{simulation_date}'", "BidSize > 0", "AskSize > 0"]) \
-    .view(["Date", "Timestamp", "Sym = LocalCodeStr", "BidPrice=Bid", "BidSize", "AskPrice=Ask", "AskSize"]) \
-    .where_in(my_symbols, "Sym") \
-    .sort("Timestamp")
+ticks_raw = db.historical_table("FeedOS", "EquityQuoteL1") \
+    .where([f"Date == simulation_date", "BidSize > 0", "AskSize > 0"]) \
+    .view(["Date", "Timestamp", "Sym = LocalCodeStr", "BidPrice=Bid", "BidSize", "AskPrice=Ask", "AskSize"])
 
-print(f"[INFO] Loaded historical market data")
+print(f"[INFO] Raw FeedOS data: {ticks_raw.size} ticks")
+if ticks_raw.size > 0:
+    all_symbols_in_feedos = ticks_raw.select_distinct("Sym").sort("Sym")
+    print(f"[INFO] All symbols in FeedOS for {simulation_date}: {all_symbols_in_feedos.view(['Sym']).to_string()}")
+else:
+    print(f"[WARNING] No FeedOS data found for {simulation_date}!")
+
+ticks_bid_ask = ticks_raw.where_in(my_symbols, "Sym").sort("Timestamp")
+
+print(f"[INFO] Loaded historical market data: {ticks_bid_ask.size} ticks")
+if ticks_bid_ask.size == 0:
+    print(f"[WARNING] No market data found for partition {partition_id} symbols!")
+else:
+    symbols_in_data = ticks_bid_ask.select_distinct("Sym").sort("Sym")
+    print(f"[INFO] Symbols present in loaded data: {symbols_in_data.view(['Sym']).to_string()}")
 
 ############################################################################################################
 # Compute predictions using EMA
@@ -224,24 +240,36 @@ def write_partitioned_tables():
     
     # Partition key: SimulationName_Date_PartitionID
     partition_key = f"{simulation_name}_{simulation_date}_{partition_id}"
+    print(f"[INFO] Using partition key: {partition_key}")
     
     for table, table_name in tables_to_write:
         try:
             table_with_partitions = table.update_view(partition_updates)
+            row_count = table_with_partitions.size
+            print(f"[INFO] Preparing to write {table_name}: {row_count} rows (partition_key={partition_key})")
             
-            # Create table schema if it doesn't exist
+            if row_count == 0:
+                print(f"[WARNING] {table_name} has ZERO rows for partition_key={partition_key}!")
+            
+            # Try to create table schema - may race with other partitions
             try:
-                db.get_partitioned_table(output_namespace, table_name)
-            except:
-                # Table doesn't exist, create schema
-                # The prototype must NOT include the partitioning column
                 db.add_partitioned_table_schema(output_namespace, table_name, "PartitionKey", table_with_partitions)
                 print(f"[INFO] Created table schema: {table_name}")
+            except Exception as schema_error:
+                # Schema may already exist from another partition - this is OK
+                if "table already exists" in str(schema_error).lower() or "already exists" in str(schema_error).lower():
+                    print(f"[INFO] Table schema already exists: {table_name} (another partition created it)")
+                else:
+                    raise
             
+            print(f"[INFO] Calling add_table_partition(namespace='{output_namespace}', table_name='{table_name}', partition_key='{partition_key}', rows={row_count})")
             db.add_table_partition(output_namespace, table_name, partition_key, table_with_partitions)
-            print(f"[INFO] Wrote {table_name}")
+            print(f"[INFO] Successfully wrote {table_name} with {row_count} rows to partition key: {partition_key}")
         except Exception as e:
             print(f"[ERROR] Failed to write {table_name}: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     print(f"[INFO] Successfully wrote all tables to user tables")
 

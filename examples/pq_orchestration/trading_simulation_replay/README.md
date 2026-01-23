@@ -84,7 +84,11 @@ See the [main README](../README.md) for setup instructions. This example require
 
 **1. Configure** - Edit [`config.yaml`](config.yaml) to set date range and parameters. For testing, use a small date range (1-5 days).
 
-**2. Clean existing tables** - Run [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console and call `delete_all_tables()` to remove any previous simulation data.
+**2. Clean existing tables** - Run the cleanup script to remove any previous simulation data:
+
+```bash
+pq-orchestrator --config trading_simulation_replay/cleanup.yaml
+```
 
 **3. Run** - From the `pq_orchestration` directory:
 
@@ -160,41 +164,27 @@ aapl_stats = aapl["stats"]               # Performance summary for AAPL
 
 All functions return dictionaries of Deephaven tables that automatically display in the UI when assigned to variables.
 
-### [manage_user_tables.py](manage_user_tables.py)
+### [cleanup.py](cleanup.py) and [cleanup.yaml](cleanup.yaml)
 
-Table management utilities for accessing and cleaning simulation data.
+Cleanup script and configuration for deleting all simulation tables.
 
-**Load the script:**
+**Usage:**
 
-In the Deephaven IDE console, open the script file and execute it directly (use the "Run" button or Ctrl/Cmd+Enter).
+Run via the orchestrator to delete all tables in the simulation namespace:
 
-**Common operations:**
-
-```python
-# List all simulation tables with row counts
-list_tables()
-
-# Get a table for querying
-trades = get_table("TradingSimTrades")
-pnl = get_table("TradingSimPnl")
-
-# Query the data
-trades.where("Sym = `AAPL`").tail(100)
-pnl.view(["Date", "Sym", "PnL"])
-
-# Delete specific table
-delete_table("TradingSimTrades")
-
-# Delete all simulation data (use before new runs)
-delete_all_tables()
+```bash
+pq-orchestrator --config trading_simulation_replay/cleanup.yaml
 ```
 
-**Available functions:**
+This will delete all 7 tables created by the replay simulation:
 
-- `list_tables()` - Show all tables in namespace with row counts
-- `get_table(name)` - Retrieve a table for analysis
-- `delete_table(name)` - Delete a specific table
-- `delete_all_tables()` - Delete all simulation tables (prompts for confirmation)
+- TradingSimTrades
+- TradingSimPositions
+- TradingSimPnl
+- TradingSimPreds
+- TradingSimOrders
+- TradingSimExecutions
+- TradingSimSummary
 
 ## Expected Results
 
@@ -250,6 +240,7 @@ To adapt for your use case:
 
 - [`trading_simulation_replay.py`](trading_simulation_replay.py) - Replay worker script
 - [`config.yaml`](config.yaml) - Replay configuration
-- [`manage_user_tables.py`](manage_user_tables.py) - Table management utilities
+- [`cleanup.py`](cleanup.py) - Cleanup script for deleting tables
+- [`cleanup.yaml`](cleanup.yaml) - Cleanup orchestrator configuration
 - [`analyze_trading_results.py`](analyze_trading_results.py) - Performance analysis tools
 - [`README.md`](README.md) - This file

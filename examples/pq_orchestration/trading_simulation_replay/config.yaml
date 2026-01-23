@@ -24,7 +24,7 @@ replay:
 
 dates:
   start: "2024-01-01"
-  end: "2024-12-31"
+  end: "2024-01-31"
   weekdays_only: true
   
 env:
