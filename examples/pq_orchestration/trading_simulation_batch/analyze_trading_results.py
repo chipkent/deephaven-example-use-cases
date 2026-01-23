@@ -47,7 +47,7 @@ Quick Start Example:
     top_performers = summary["top_performers"]  # Assigns table to variable, displays in UI
 """
 
-from typing import Dict, Optional, Any
+from typing import Dict, Any
 from deephaven import agg
 from deephaven.updateby import cum_sum, cum_max
 from deephaven.plot.figure import Figure
