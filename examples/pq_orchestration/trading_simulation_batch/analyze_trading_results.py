@@ -24,10 +24,6 @@ Expected Input Tables (created by trading simulation in ExampleBatchTradingSim n
         Columns: Sym, Position, SimulationName
         Position is the number of shares held (can be negative for short positions)
     
-    - TradingSimExecutions: Trading signals/decisions
-        Columns: Date, Timestamp, Sym, Action, SimulationName
-        Action can be: BUY, SELL, NO_TRADE, or other strategy-specific values
-    
     - TradingSimSummary: High-level summary by symbol
         Columns: Sym, TradeCount, TotalShares, SimulationName
 
