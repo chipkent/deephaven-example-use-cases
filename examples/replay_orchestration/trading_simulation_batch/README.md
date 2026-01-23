@@ -1,6 +1,6 @@
 # Trading Simulation Batch Example
 
-Vectorized trading simulation using historical market data with PQ orchestration in batch mode.
+Vectorized trading simulation using historical market data with batch mode orchestration.
 
 ## Overview
 
@@ -9,7 +9,6 @@ This example demonstrates how to perform large-scale trading strategy backtests 
 ## What It Does
 
 Simulates a mean-reversion trading strategy on historical market data:
-
 1. Loads historical equity quote data for assigned symbols
 2. Computes EMA-based buy/sell predictions across all ticks
 3. Generates trades using vectorized logic with position tracking
@@ -19,14 +18,12 @@ Simulates a mean-reversion trading strategy on historical market data:
 ## Trading Logic
 
 **Vectorized Implementation**:
-
 - Uses `group_by().update(UDF).ungroup()` pattern
 - UDF processes all ticks for each symbol sequentially
 - Maintains position state across trades within the UDF
 - Returns array of trade sizes for all ticks
 
 **Strategy**:
-
 - **Buy signal**: Ask price < (EMA - StdDev)
 - **Sell signal**: Bid price > (EMA + StdDev)
 - **Position limits**: $10,000 maximum position value
@@ -35,7 +32,6 @@ Simulates a mean-reversion trading strategy on historical market data:
 ## Key Differences from Replay Version
 
 **Data Access**:
-
 ```python
 # Replay version
 ticks = db.live_table("FeedOS", "EquityQuoteL1")
@@ -46,12 +42,10 @@ ticks = db.historical_table("FeedOS", "EquityQuoteL1") \
 ```
 
 **Computation Model**:
-
 - Replay: Incremental processing as data ticks in
 - Batch: Vectorized processing of complete day's data
 
 **Termination**:
-
 - Replay: Manual `stop_and_wait()` call
 - Batch: Automatic termination via RunAndDone
 
@@ -62,7 +56,6 @@ ticks = db.historical_table("FeedOS", "EquityQuoteL1") \
 **File**: [`config.yaml`](config.yaml)
 
 Key settings:
-
 ```yaml
 execution:
   num_partitions: 2
@@ -89,23 +82,31 @@ See the [main README](../README.md) for setup instructions. This example require
 
 **1. Configure** - Edit [`config.yaml`](config.yaml) to set date range and parameters. For testing, use a small date range (1-5 days).
 
-**2. Clean existing tables** - Run the cleanup script to remove any previous simulation data:
+**2. Clean existing tables** - Run [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console and call `delete_all_tables()` to remove any previous simulation data.
+
+**3. Run** - From the `replay_orchestration` directory:
 
 ```bash
-pq-orchestrator --config trading_simulation_batch/cleanup.yaml
+replay-orchestrator --config trading_simulation_batch/config.yaml
 ```
 
-**3. Run** - Set environment variables and run from the `pq_orchestration` directory:
+This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleBatchTradingSim` namespace. Tables are auto-created on first write.
 
+## Running
+
+Set environment variables:
 ```bash
 export DH_CONNECTION_URL="https://your-server:8000/iris/connection.json"
 export DH_USERNAME="your_username"
 export DH_PASSWORD="your_password"
-
-pq-orchestrator --config trading_simulation_batch/config.yaml
 ```
 
-This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleBatchTradingSim` namespace. Tables are auto-created on first write. Monitor progress in the console output. Press Ctrl+C to gracefully stop.
+Run the orchestrator:
+```bash
+replay-orchestrator --config trading_simulation_batch/config.yaml
+```
+
+Monitor progress in the console output. Press Ctrl+C to gracefully stop.
 
 ## Output Tables
 
@@ -161,7 +162,6 @@ def compute_trades(close_only, pred_buy, pred_sell, bid, ask, mid, trade_sizes):
 ```
 
 Applied via group_by with pre-computed close-out flag:
-
 ```python
 trades = preds \
     .update_view(["CloseOnly = Timestamp >= close_out_time"]) \
@@ -172,7 +172,6 @@ trades = preds \
 ```
 
 **Performance optimizations:**
-
 - **Numba JIT compilation**: [`@numba.guvectorize`](https://numba.pydata.org/numba-doc/latest/user/vectorize.html#the-guvectorize-decorator) compiles to optimized machine code
 - **Pre-computed close flag**: Boolean array avoids repeated timestamp comparisons
 - **Vectorized types**: Explicit type signatures enable SIMD optimizations
@@ -237,25 +236,41 @@ aapl_stats = aapl["stats"]               # Performance summary for AAPL
 
 All functions return dictionaries of Deephaven tables that automatically display in the UI when assigned to variables.
 
-### [cleanup.py](cleanup.py) and [cleanup.yaml](cleanup.yaml)
+### [manage_user_tables.py](manage_user_tables.py)
 
-Cleanup script and configuration for deleting all simulation tables.
+Table management utilities for accessing and cleaning simulation data.
 
-**Usage:**
+**Load the script:**
 
-Run via the orchestrator to delete all tables in the simulation namespace:
+In the Deephaven IDE console, open the script file and execute it directly (use the "Run" button or Ctrl/Cmd+Enter).
 
-```bash
-pq-orchestrator --config trading_simulation_batch/cleanup.yaml
+**Common operations:**
+
+```python
+# List all simulation tables with row counts
+list_tables()
+
+# Get a table for querying
+trades = get_table("TradingSimTrades")
+pnl = get_table("TradingSimPnl")
+
+# Query the data
+trades.where("Sym = `AAPL`").tail(100)
+pnl.view(["Date", "Sym", "PnL"])
+
+# Delete specific table
+delete_table("TradingSimTrades")
+
+# Delete all simulation data (use before new runs)
+delete_all_tables()
 ```
 
-This will delete all 5 tables created by the batch simulation:
+**Available functions:**
 
-- TradingSimTrades
-- TradingSimPositions
-- TradingSimPnl
-- TradingSimPreds
-- TradingSimSummary
+- `list_tables()` - Show all tables in namespace with row counts
+- `get_table(name)` - Retrieve a table for analysis
+- `delete_table(name)` - Delete a specific table
+- `delete_all_tables()` - Delete all simulation tables (prompts for confirmation)
 
 ## Expected Results
 
@@ -274,7 +289,6 @@ All data will be queryable in Deephaven for analysis and visualization.
 
 - [`trading_simulation_batch.py`](trading_simulation_batch.py) - Batch worker script
 - [`config.yaml`](config.yaml) - Batch configuration
-- [`cleanup.py`](cleanup.py) - Cleanup script for deleting tables
-- [`cleanup.yaml`](cleanup.yaml) - Cleanup orchestrator configuration
+- [`manage_user_tables.py`](manage_user_tables.py) - Table management utilities
 - [`analyze_trading_results.py`](analyze_trading_results.py) - Performance analysis tools
 - [`README.md`](README.md) - This file

@@ -1,6 +1,6 @@
 # Trading Simulation Replay Example
 
-A market maker simulation based on mean-reversion strategy, designed to backtest trading algorithms across historical data using the persistent query orchestration framework with realistic time-based data arrival.
+A market maker simulation based on mean-reversion strategy, designed to backtest trading algorithms across historical data using the replay orchestration framework with realistic time-based data arrival.
 
 ## Overview
 
@@ -31,7 +31,7 @@ num_partitions = int(os.getenv("NUM_PARTITIONS"))  # 2 partitions per date
 my_symbols = all_symbols.where(f"Sym.hashCode() % {num_partitions} == {partition_id}")
 ```
 
-**Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in [`trading_simulation_replay.py`](trading_simulation_replay.py).
+**Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in [`trading_simulation.py`](trading_simulation.py).
 
 ### Configuration
 
@@ -84,16 +84,12 @@ See the [main README](../README.md) for setup instructions. This example require
 
 **1. Configure** - Edit [`config.yaml`](config.yaml) to set date range and parameters. For testing, use a small date range (1-5 days).
 
-**2. Clean existing tables** - Run the cleanup script to remove any previous simulation data:
+**2. Clean existing tables** - Run [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console and call `delete_all_tables()` to remove any previous simulation data.
+
+**3. Run** - From the `replay_orchestration` directory:
 
 ```bash
-pq-orchestrator --config trading_simulation_replay/cleanup.yaml
-```
-
-**3. Run** - From the `pq_orchestration` directory:
-
-```bash
-pq-orchestrator --config trading_simulation_replay/config.yaml
+replay-orchestrator --config trading_simulation_replay/config.yaml
 ```
 
 This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleReplayTradingSim` namespace. Tables are auto-created on first write.
@@ -127,7 +123,7 @@ In the Deephaven IDE console, open the script file and execute it directly (use 
 **Quick start workflow:**
 
 ```python
-# Your simulation name from config.yaml (line 1 of config.yaml)
+# Your simulation name from config.yaml
 sim_name = "trading_simulation_replay"
 
 # Step 1: Get high-level overview
@@ -164,27 +160,41 @@ aapl_stats = aapl["stats"]               # Performance summary for AAPL
 
 All functions return dictionaries of Deephaven tables that automatically display in the UI when assigned to variables.
 
-### [cleanup.py](cleanup.py) and [cleanup.yaml](cleanup.yaml)
+### [manage_user_tables.py](manage_user_tables.py)
 
-Cleanup script and configuration for deleting all simulation tables.
+Table management utilities for accessing and cleaning simulation data.
 
-**Usage:**
+**Load the script:**
 
-Run via the orchestrator to delete all tables in the simulation namespace:
+In the Deephaven IDE console, open the script file and execute it directly (use the "Run" button or Ctrl/Cmd+Enter).
 
-```bash
-pq-orchestrator --config trading_simulation_replay/cleanup.yaml
+**Common operations:**
+
+```python
+# List all simulation tables with row counts
+list_tables()
+
+# Get a table for querying
+trades = get_table("TradingSimTrades")
+pnl = get_table("TradingSimPnl")
+
+# Query the data
+trades.where("Sym = `AAPL`").tail(100)
+pnl.view(["Date", "Sym", "PnL"])
+
+# Delete specific table
+delete_table("TradingSimTrades")
+
+# Delete all simulation data (use before new runs)
+delete_all_tables()
 ```
 
-This will delete all 7 tables created by the replay simulation:
+**Available functions:**
 
-- TradingSimTrades
-- TradingSimPositions
-- TradingSimPnl
-- TradingSimPreds
-- TradingSimOrders
-- TradingSimExecutions
-- TradingSimSummary
+- `list_tables()` - Show all tables in namespace with row counts
+- `get_table(name)` - Retrieve a table for analysis
+- `delete_table(name)` - Delete a specific table
+- `delete_all_tables()` - Delete all simulation tables (prompts for confirmation)
 
 ## Expected Results
 
@@ -230,17 +240,8 @@ See [`examples/finance/simulated_market_maker`](../../finance/simulated_market_m
 
 To adapt for your use case:
 
-1. **Change stock universe**: Modify the `all_symbols` table in [`trading_simulation_replay.py`](trading_simulation_replay.py)
+1. **Change stock universe**: Modify the `all_symbols` table in [`trading_simulation.py`](trading_simulation.py)
 2. **Adjust strategy parameters**: Update `MAX_POSITION_DOLLARS`, `EMA_DECAY_TIME`, `LOT_SIZE` in [`config.yaml`](config.yaml)
 3. **Scale partitions**: Increase `num_partitions` to process more symbols in parallel
 4. **Adjust date range**: Modify `dates.start` and `dates.end` in [`config.yaml`](config.yaml)
 5. **Speed up replay**: Increase `replay_speed` for faster backtesting (currently 100x)
-
-## Files
-
-- [`trading_simulation_replay.py`](trading_simulation_replay.py) - Replay worker script
-- [`config.yaml`](config.yaml) - Replay configuration
-- [`cleanup.py`](cleanup.py) - Cleanup script for deleting tables
-- [`cleanup.yaml`](cleanup.yaml) - Cleanup orchestrator configuration
-- [`analyze_trading_results.py`](analyze_trading_results.py) - Performance analysis tools
-- [`README.md`](README.md) - This file

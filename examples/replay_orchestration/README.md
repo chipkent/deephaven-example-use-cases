@@ -1,17 +1,15 @@
-# Persistent Query Orchestration Framework
+# Replay Orchestration Framework
 
 A generic framework for orchestrating Deephaven Enterprise persistent queries across multiple dates with parallel partitions per date. Supports both **replay mode** (live data simulation) and **batch mode** (historical data processing).
 
 ## Execution Modes
 
 ### Replay Mode
-
 **What are replay persistent queries?** They allow you to run Deephaven queries against historical data as if it were live, making it possible to backtest strategies or reprocess data while maintaining the same code you'd use in production. See [Deephaven Replay Documentation](https://deephaven.io/enterprise/docs/deephaven-database/replayer/) for details.
 
 **Use cases**: Strategy backtesting with realistic data arrival, testing production code on historical periods, reprocessing data with time-aware logic.
 
 ### Batch Mode
-
 **What are batch persistent queries?** They process complete historical datasets using vectorized table operations, ideal for analytics and simulations that don't require time-based data arrival simulation.
 
 **Use cases**: Large-scale data analytics, Monte Carlo simulations, parameter sweeps, vectorized strategy backtests.
@@ -55,13 +53,11 @@ The orchestrator creates and manages persistent queries based on a configuration
 ## Use Cases
 
 ### Replay Mode
-
 - **Realistic strategy backtesting**: Test trading algorithms with realistic data arrival timing
 - **Production code validation**: Verify production queries work correctly on historical periods
 - **Time-aware reprocessing**: Reprocess data maintaining temporal relationships
 
 ### Batch Mode
-
 - **Vectorized backtesting**: Fast strategy evaluation on complete historical datasets
 - **Risk analysis**: Calculate risk metrics across multiple scenarios
 - **Data processing**: Process large datasets by partitioning work
@@ -71,36 +67,32 @@ The orchestrator creates and manages persistent queries based on a configuration
 ## Directory Structure
 
 ```text
-pq_orchestration/
-├── README.md                                    # This file
-├── setup.py                                     # Package setup with dependencies
-├── pq_orchestrator.py                          # Generic orchestrator script
-├── simple_worker_replay/                        # Minimal replay example
-│   ├── simple_worker_replay.py                  # Worker script
-│   ├── config.yaml                              # Configuration
-│   └── README.md                                # Documentation
-├── simple_worker_batch/                         # Minimal batch example
-│   ├── simple_worker_batch.py                   # Worker script
-│   ├── config.yaml                              # Configuration
-│   └── README.md                                # Documentation
-├── trading_simulation_replay/                   # Trading replay example
-│   ├── trading_simulation_replay.py             # Worker script
-│   ├── analyze_trading_results.py               # Analysis tools
-│   ├── manage_user_tables.py                    # Table utilities
-│   ├── config.yaml                              # Configuration
-│   └── README.md                                # Documentation
-└── trading_simulation_batch/                    # Trading batch example
-    ├── trading_simulation_batch.py              # Worker script
-    ├── analyze_trading_results.py               # Analysis tools
-    ├── manage_user_tables.py                    # Table utilities
-    ├── config.yaml                              # Configuration
-    └── README.md                                # Documentation
+replay_orchestration/
+├── README.md                        # This file
+├── setup.py                         # Package setup with dependencies
+├── replay_orchestrator.py          # Generic orchestrator script
+├── simple_worker_replay/            # Minimal replay example
+│   ├── simple_worker.py
+│   ├── config.yaml
+│   └── README.md
+├── simple_worker_batch/             # Minimal batch example
+│   ├── simple_worker_batch.py
+│   ├── config.yaml
+│   └── README.md
+├── trading_simulation_replay/       # Trading replay example
+│   ├── trading_simulation.py
+│   ├── config.yaml
+│   └── README.md
+└── trading_simulation_batch/        # Trading batch example
+    ├── trading_simulation_batch.py
+    ├── config.yaml
+    └── README.md
 ```
 
 **Core Files**:
 
 - [`setup.py`](setup.py) - Package setup with Python version enforcement
-- [`pq_orchestrator.py`](pq_orchestrator.py) - Main orchestrator script (supports both modes)
+- [`replay_orchestrator.py`](replay_orchestrator.py) - Main orchestrator script (supports both modes)
 
 **Replay Examples**:
 
@@ -144,17 +136,12 @@ export DH_USERNAME="your_username"
 export DH_PASSWORD="your_password"
 ```
 
-### 3. Run a Simple Worker Example
-
-**Choose an example:**
-
-- **Replay mode**: [`simple_worker_replay/config.yaml`](simple_worker_replay/config.yaml) - demonstrates replay with time-based data arrival
-- **Batch mode**: [`simple_worker_batch/config.yaml`](simple_worker_batch/config.yaml) - demonstrates batch processing of complete datasets
+### 3. Run the Simple Worker Example
 
 **Test configuration first (recommended):**
 
 ```bash
-pq-orchestrator --config simple_worker_replay/config.yaml --dry-run
+replay-orchestrator --config simple_worker/config.yaml --dry-run
 ```
 
 This validates your configuration without creating any sessions.
@@ -162,15 +149,15 @@ This validates your configuration without creating any sessions.
 **Run the orchestrator:**
 
 ```bash
-pq-orchestrator --config simple_worker_replay/config.yaml
+replay-orchestrator --config simple_worker/config.yaml
 ```
 
-This will create 10 sessions (5 weekdays × 2 partitions per date). Monitor progress in the console output. Press Ctrl+C to gracefully stop (finishes current operations before exiting).
+This will create 10 replay sessions (5 weekdays × 2 partitions per date). Monitor progress in the console output. Press Ctrl+C to gracefully stop (finishes current operations before exiting).
 
 ## Command-Line Options
 
 ```bash
-pq-orchestrator --config <path> [--dry-run] [--verbose]
+replay-orchestrator --config <path> [--dry-run] [--verbose]
 ```
 
 **Options:**
@@ -212,8 +199,8 @@ name: "my_simulation"
 
 - `name` (required): Unique identifier for this simulation run. Used to:
   - Namespace persistent query names:
-    - Replay mode: `pq_replay_{name}_{YYYYMMDD}_{partition_id}` (e.g., `pq_replay_mysim_20240115_0`)
-    - Batch mode: `pq_batch_{name}_{YYYYMMDD}_{partition_id}` (e.g., `pq_batch_mysim_20240115_0`)
+    - Replay mode: `replay_{name}_{YYYYMMDD}_{partition_id}` (e.g., `replay_mysim_20240115_0`)
+    - Batch mode: `batch_{name}_{YYYYMMDD}_{partition_id}` (e.g., `batch_mysim_20240115_0`)
   - Avoid conflicts when running multiple simulations
   - Available to worker scripts via `SIMULATION_NAME` environment variable
 
@@ -419,7 +406,7 @@ The orchestrator automatically sets these environment variables for each worker 
 - `SIMULATION_DATE`: The date being processed (YYYY-MM-DD string format)
 - `PARTITION_ID`: Partition ID (0 to NUM_PARTITIONS-1) for dividing work across partitions
 - `NUM_PARTITIONS`: Total number of partitions per date
-- `QUERY_NAME`: The persistent query name (format: `pq_{mode}_{name}_{YYYYMMDD}_{partition_id}` where mode is "replay" or "batch")
+- `QUERY_NAME`: The persistent query name (`replay_{name}_{YYYYMMDD}_{partition_id}`)
 
 **Note:** For date operations in your worker script, use [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today) from the [`deephaven.time`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html) module rather than `SIMULATION_DATE`. The [`dh_today()`](https://docs.deephaven.io/core/pydoc/code/deephaven.time.html#deephaven.time.dh_today) function works correctly in both replay and production environments.
 
@@ -454,39 +441,35 @@ process_data(date, my_stocks)
 
 ## Examples
 
-### Simple Worker Examples
+### Simple Worker
 
-**Replay Mode**: [`simple_worker_replay/`](simple_worker_replay/)
+Location: [`simple_worker/`](simple_worker/)
 
-- Minimal example demonstrating replay mode with time-based data arrival simulation
-- Creates a status table to verify orchestration is working
-- **Scale**: 2 partitions per date × 5 weekdays = 10 sessions
-- See [`simple_worker_replay/README.md`](simple_worker_replay/README.md)
+**Purpose**: Minimal example to verify your orchestration setup works correctly.
 
-**Batch Mode**: [`simple_worker_batch/`](simple_worker_batch/)
+**What it does**: Creates a status table showing which worker processed which date.
 
-- Minimal example demonstrating batch mode for processing complete datasets
-- Creates a status table to verify orchestration is working
-- **Scale**: 2 partitions per date × 5 weekdays = 10 sessions
-- See [`simple_worker_batch/README.md`](simple_worker_batch/README.md)
+**Scale**: 2 partitions per date × 5 weekdays (Jan 1-5, 2024) = 10 sessions
 
-### Trading Simulation Examples
+See [`simple_worker/README.md`](simple_worker/README.md) for details.
 
-**Replay Mode**: [`trading_simulation_replay/`](trading_simulation_replay/)
+### Trading Simulation
 
-- Mean-reversion trading strategy with realistic time-based data arrival
-- Processes historical market data as if it were live
-- **Scale**: 2 partitions per date × 250 trading days = 500 sessions
+Location: [`trading_simulation/`](trading_simulation/)
+
+**Status**: Placeholder implementation - demonstrates configuration but trading logic not yet implemented.
+
+**Purpose**: Backtest a mean-reversion market making strategy across a full year.
+
+**Planned features**:
+
+- Simulate trading for different stock subsets in parallel
+- Write trades/positions/PnL to partitioned tables
 - Based on [`examples/finance/simulated_market_maker`](../finance/simulated_market_maker)
-- See [`trading_simulation_replay/README.md`](trading_simulation_replay/README.md)
 
-**Batch Mode**: [`trading_simulation_batch/`](trading_simulation_batch/)
+**Scale**: 10 partitions per date × 250 trading days = 2,500 sessions
 
-- Vectorized trading strategy using batch processing
-- Processes complete historical datasets with optimized table operations
-- **Scale**: 2 partitions per date × 250 trading days = 500 sessions
-- Uses numba-optimized UDF for high-performance computation
-- See [`trading_simulation_batch/README.md`](trading_simulation_batch/README.md)
+See [`trading_simulation/README.md`](trading_simulation/README.md) for implementation details.
 
 ## Monitoring and Progress
 
@@ -513,10 +496,9 @@ The orchestrator provides real-time progress information:
 In the Deephaven Enterprise UI:
 
 1. Navigate to **Persistent Queries** section
-2. Look for queries named: `pq_{mode}_{simulation_name}_{date}_{partition_id}` (where mode is "replay" or "batch")
-3. Filter by `pq_` prefix to see only orchestrated queries
-4. Check status: Running, Completed, Failed, etc.
-5. View logs and output tables for each query
+2. Look for queries named: `replay_{simulation_name}_{date}_{partition_id}`
+3. Check status: Running, Completed, Failed, etc.
+4. View logs and output tables for each query
 
 ### Output Tables
 
@@ -573,8 +555,7 @@ The orchestrator configures replay persistent queries with:
 Run with `--dry-run` first to catch configuration errors:
 
 ```bash
-python pq_orchestrator.py --config your_config.yaml --dry-run  # Run directly
-pq-orchestrator --config your_config.yaml --dry-run            # Or use installed command
+python replay_orchestrator.py --config your_config.yaml --dry-run
 ```
 
 Common validation errors:
@@ -605,7 +586,7 @@ ls -la /path/to/private_key
 
 Worker script path is **relative to the config file directory**, not the current working directory.
 
-Example: If config is at [`simple_worker_replay/config.yaml`](simple_worker_replay/config.yaml) and specifies `worker_script: "simple_worker_replay.py"`, the script must be at [`simple_worker_replay/simple_worker_replay.py`](simple_worker_replay/simple_worker_replay.py).
+Example: If config is at `simple_worker/config.yaml` and specifies `worker_script: "simple_worker.py"`, the script must be at `simple_worker/simple_worker.py`.
 
 ### Session Creation Failures
 
