@@ -226,7 +226,6 @@ aapl_stats = aapl["stats"]               # Performance summary for AAPL
 - `analyze_by_symbol(sim_name, sym)` - Deep dive on a specific stock
 - `analyze_by_date(sim_name, date)` - Analyze a specific trading day
 - `analyze_positions(sim_name)` - Position sizing and distribution
-- `analyze_executions(sim_name)` - Trading signal patterns
 
 **Key metrics explained:**
 
