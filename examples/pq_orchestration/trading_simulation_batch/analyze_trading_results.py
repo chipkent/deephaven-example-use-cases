@@ -191,7 +191,7 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         print(f"[ERROR] Failed to analyze P&L: {e}")
         raise
 
-def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
+def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Dict[str, Any]:
     """
     Analyze trading activity including turnover and execution patterns.
     
@@ -203,7 +203,7 @@ def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPA
         output_namespace: Namespace where tables are stored (default: "ExampleBatchTradingSim")
         
     Returns:
-        Dictionary containing five Deephaven tables, or None if an error occurs:
+        Dictionary containing five Deephaven tables:
         
         - "trades": Raw trade records filtered to this simulation
         
@@ -217,8 +217,8 @@ def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPA
         - "by_date": Daily trading metrics:
             * TradeCount: Number of trades executed on this date
             * Volume: Total shares traded (sum of absolute values)
-            * UniqueSymbols: Number of different stocks traded
-            * Turnover: Total dollar value traded (Volume × Price). Use for cost estimation
+            * AvgTradeSize: Average shares per trade
+            * Turnover: Total dollar value traded (sum of |price × size|). Use for cost estimation
         
         - "by_side": Buy vs Sell comparison:
             * Side: "BUY" or "SELL"
@@ -226,6 +226,9 @@ def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPA
             * TotalShares: Total shares traded in this direction
         
         - "overall": Single-row aggregate statistics across all trades
+    
+    Raises:
+        Exception: If the analysis fails (e.g., simulation not found, missing tables)
     
     Example:
         result = analyze_trades("my_simulation")
@@ -289,7 +292,7 @@ def analyze_trades(simulation_name: str, output_namespace: str = DEFAULT_NAMESPA
         print(f"[ERROR] Failed to analyze trades: {e}")
         raise
 
-def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
+def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str = DEFAULT_NAMESPACE) -> Dict[str, Any]:
     """
     Deep dive analysis for a specific symbol with risk metrics.
     
@@ -302,7 +305,7 @@ def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str =
         output_namespace: Deephaven namespace containing the tables (default: DEFAULT_NAMESPACE)
         
     Returns:
-        Dictionary with the following keys, or None if error:
+        Dictionary with the following keys:
         - "trades": All trades for this symbol
         - "trade_timeline": Chronological trade sequence (Date, Timestamp, Price, Size)
         - "pnl": P&L table for this symbol
@@ -311,6 +314,9 @@ def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str =
         - "position_history": Position evolution
         - "stats": Summary statistics (TotalTrades, NetShares, AvgPrice, TotalPnL, 
                    WinRate, SharpeRatio)
+    
+    Raises:
+        Exception: If the analysis fails (e.g., simulation not found, symbol not found)
     """
     print(f"[INFO] Analyzing symbol {symbol} for simulation: {simulation_name}...")
     
@@ -382,7 +388,7 @@ def analyze_by_symbol(simulation_name: str, symbol: str, output_namespace: str =
         print(f"[ERROR] Failed to analyze symbol {symbol}: {e}")
         raise
 
-def analyze_by_date(simulation_name: str, date: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
+def analyze_by_date(simulation_name: str, date: str, output_namespace: str = DEFAULT_NAMESPACE) -> Dict[str, Any]:
     """
     Analyze trading activity and performance for a specific date.
     
@@ -394,7 +400,7 @@ def analyze_by_date(simulation_name: str, date: str, output_namespace: str = DEF
         output_namespace: Deephaven namespace containing the tables (default: DEFAULT_NAMESPACE)
         
     Returns:
-        Dictionary with the following keys, or None if error:
+        Dictionary with the following keys:
         - "trades": All trades on this date
         - "trades_by_symbol": Per-symbol activity (TradeCount, TotalShares)
         - "pnl": P&L for this date
@@ -402,6 +408,9 @@ def analyze_by_date(simulation_name: str, date: str, output_namespace: str = DEF
         - "timeline": Chronological trade sequence (Timestamp, Sym, Price, Size)
         - "trade_stats": Overall statistics for the day
         - "pnl_stats": P&L statistics for the day
+    
+    Raises:
+        Exception: If the analysis fails (e.g., simulation not found, date not found)
     """
     print(f"[INFO] Analyzing date {date} for simulation: {simulation_name}...")
     
@@ -457,7 +466,7 @@ def analyze_by_date(simulation_name: str, date: str, output_namespace: str = DEF
         print(f"[ERROR] Failed to analyze date {date}: {e}")
         raise
 
-def analyze_positions(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
+def analyze_positions(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Dict[str, Any]:
     """
     Analyze position sizing and distribution across the simulation.
     
@@ -469,11 +478,14 @@ def analyze_positions(simulation_name: str, output_namespace: str = DEFAULT_NAME
         output_namespace: Deephaven namespace containing the tables (default: DEFAULT_NAMESPACE)
         
     Returns:
-        Dictionary with the following keys, or None if error:
+        Dictionary with the following keys:
         - "positions": All position snapshots
         - "final_positions": Ending positions (non-zero only), sorted by size
         - "by_symbol": Position statistics per symbol (AvgPosition, MinPosition, MaxPosition)
         - "overall": Aggregate position statistics (UniqueSymbols, AvgPosition, MaxPosition)
+    
+    Raises:
+        Exception: If the analysis fails (e.g., simulation not found, missing tables)
     """
     print(f"[INFO] Analyzing positions for simulation: {simulation_name}...")
     
@@ -518,7 +530,7 @@ def analyze_positions(simulation_name: str, output_namespace: str = DEFAULT_NAME
         print(f"[ERROR] Failed to analyze positions: {e}")
         raise
 
-def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
+def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Dict[str, Any]:
     """
     Get high-level summary with performance rankings - START HERE!
     
@@ -530,7 +542,7 @@ def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         output_namespace: Namespace where tables are stored (default: "ExampleBatchTradingSim")
         
     Returns:
-        Dictionary containing eight items (3 raw tables + 5 summary tables), or None if error:
+        Dictionary containing eight items (3 raw tables + 5 summary tables):
         
         - "trades": All trade records for this simulation (unfiltered raw data)
         - "pnl": All P&L records for this simulation (unfiltered raw data)
@@ -552,6 +564,9 @@ def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         
         - "top_performers": Top 5 symbols ranked by total P&L (best performers)
         - "bottom_performers": Bottom 5 symbols ranked by total P&L (worst performers)
+    
+    Raises:
+        Exception: If the analysis fails (e.g., simulation not found, missing tables)
     
     Example:
         summary = get_summary("my_simulation")
