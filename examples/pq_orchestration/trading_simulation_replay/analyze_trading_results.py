@@ -63,7 +63,7 @@ DEFAULT_NAMESPACE = "ExampleReplayTradingSim"
 # Default simulation name from config.yaml
 DEFAULT_SIMULATION_NAME = "trading_simulation_replay"
 
-def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
+def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Dict[str, Any]:
     """
     Analyze profit and loss with risk-adjusted metrics for a specific simulation.
     
@@ -75,7 +75,7 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         output_namespace: Namespace where tables are stored (default: "ExampleReplayTradingSim")
         
     Returns:
-        Dictionary containing four Deephaven tables, or None if an error occurs:
+        Dictionary containing the following items:
         
         - "pnl": Raw daily P&L data filtered to this simulation only
         
@@ -93,6 +93,8 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
             * CumulativePnL: Running total of P&L over time (equity curve)
             * SymbolCount: Number of symbols traded on this date
         
+        - "by_date_plot": Plot of cumulative P&L over time (equity curve)
+        
         - "overall": Single-row summary with key performance metrics:
             * TotalPnL: Total profit/loss across entire simulation
             * AvgDailyPnL: Average daily profit/loss
@@ -100,8 +102,9 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
             * SharpeRatio: Risk-adjusted return (annualized). >1 is good, >2 is excellent
             * MaxDrawdown: Worst peak-to-trough decline. More negative = worse
             * WinRate: Percentage of profitable days (0.5 = 50%)
-        
-        - "by_date_plot": Plot of cumulative P&L over time (equity curve)
+    
+    Raises:
+        Exception: If the analysis fails (e.g., simulation not found, missing tables)
     
     Example:
         result = analyze_pnl("my_simulation")

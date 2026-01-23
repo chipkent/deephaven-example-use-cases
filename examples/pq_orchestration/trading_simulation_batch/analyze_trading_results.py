@@ -38,7 +38,6 @@ Analysis Functions:
     - analyze_by_symbol(): Deep dive into a specific stock's performance
     - analyze_by_date(): Examine activity on a specific trading day
     - analyze_positions(): Position sizing and distribution analysis
-    - analyze_executions(): Trading signal generation patterns
 
 Key Metrics Explained:
     - Sharpe Ratio: Risk-adjusted return (higher is better, >1 is good, >2 is excellent)
@@ -63,7 +62,7 @@ DEFAULT_NAMESPACE = "ExampleBatchTradingSim"
 # Default simulation name from config.yaml
 DEFAULT_SIMULATION_NAME = "trading_simulation_batch"
 
-def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
+def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Dict[str, Any]:
     """
     Analyze profit and loss with risk-adjusted metrics for a specific simulation.
     
@@ -75,7 +74,7 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
         output_namespace: Namespace where tables are stored (default: "ExampleBatchTradingSim")
         
     Returns:
-        Dictionary containing four Deephaven tables, or None if an error occurs:
+        Dictionary containing the following items:
         
         - "pnl": Raw daily P&L data filtered to this simulation only
         
@@ -93,6 +92,8 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
             * CumulativePnL: Running total of P&L over time (equity curve)
             * SymbolCount: Number of symbols traded on this date
         
+        - "by_date_plot": Plot of cumulative P&L over time (equity curve)
+        
         - "overall": Single-row summary with key performance metrics:
             * TotalPnL: Total profit/loss across entire simulation
             * AvgDailyPnL: Average daily profit/loss
@@ -100,8 +101,9 @@ def analyze_pnl(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE)
             * SharpeRatio: Risk-adjusted return (annualized). >1 is good, >2 is excellent
             * MaxDrawdown: Worst peak-to-trough decline. More negative = worse
             * WinRate: Percentage of profitable days (0.5 = 50%)
-        
-        - "by_date_plot": Plot of cumulative P&L over time (equity curve)
+    
+    Raises:
+        Exception: If the analysis fails (e.g., simulation not found, missing tables)
     
     Example:
         result = analyze_pnl("my_simulation")
@@ -520,78 +522,6 @@ def analyze_positions(simulation_name: str, output_namespace: str = DEFAULT_NAME
         print(f"[ERROR] Failed to analyze positions: {e}")
         raise
 
-def analyze_executions(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
-    """
-    Analyze trading signals and execution effectiveness.
-    
-    Evaluates how often different trading actions occurred and their distribution
-    across symbols and dates. Useful for understanding signal generation patterns.
-    
-    Args:
-        simulation_name: Name of the simulation to analyze (required)
-        output_namespace: Deephaven namespace containing the tables (default: DEFAULT_NAMESPACE)
-        
-    Returns:
-        Dictionary with the following keys, or None if error:
-        - "executions": All execution records
-        - "by_action": Breakdown by action type (BUY, SELL, NO_TRADE, etc.)
-        - "by_symbol": Per-symbol action counts (TotalActions, BuyActions, SellActions, NoTradeActions)
-        - "by_date": Daily action patterns (TotalActions, UniqueSymbols)
-        - "overall": Aggregate execution statistics
-    """
-    print(f"[INFO] Analyzing executions for simulation: {simulation_name}...")
-    
-    try:
-        executions = db.historical_table(output_namespace, "TradingSimExecutions") \
-            .where(f"SimulationName = `{simulation_name}`")
-        
-        # Action counts
-        actions_by_type = executions.agg_by([
-            agg.count_("ActionCount")
-        ], by=["Action"]) \
-        .sort_descending("ActionCount")
-        
-        # Actions by symbol
-        actions_by_symbol = executions.update_view([
-            "IsBuy = Action == `BUY` ? 1 : 0",
-            "IsSell = Action == `SELL` ? 1 : 0",
-            "IsNoTrade = Action == `NO_TRADE` ? 1 : 0"
-        ]).agg_by([
-            agg.count_("TotalActions"),
-            agg.sum_("BuyActions=IsBuy"),
-            agg.sum_("SellActions=IsSell"),
-            agg.sum_("NoTradeActions=IsNoTrade")
-        ], by=["Sym"]) \
-        .sort_descending("TotalActions")
-        
-        # Actions by date
-        actions_by_date = executions.agg_by([
-            agg.count_("TotalActions"),
-            agg.count_distinct("UniqueSymbols=Sym")
-        ], by=["Date"]) \
-        .sort(["Date"])
-        
-        # Overall statistics
-        overall_stats = executions.agg_by([
-            agg.count_("TotalExecutions"),
-            agg.count_distinct("UniqueDates=Date"),
-            agg.count_distinct("UniqueSymbols=Sym")
-        ])
-        
-        print(f"[INFO] Execution Analysis Complete")
-        
-        return {
-            "executions": executions,
-            "by_action": actions_by_type,
-            "by_symbol": actions_by_symbol,
-            "by_date": actions_by_date,
-            "overall": overall_stats
-        }
-        
-    except Exception as e:
-        print(f"[ERROR] Failed to analyze executions: {e}")
-        raise
-
 def get_summary(simulation_name: str, output_namespace: str = DEFAULT_NAMESPACE) -> Optional[Dict[str, Any]]:
     """
     Get high-level summary with performance rankings - START HERE!
@@ -723,7 +653,6 @@ AVAILABLE FUNCTIONS:
   analyze_by_symbol(sim_name, sym)- Deep dive on a specific stock
   analyze_by_date(sim_name, date) - Analyze a specific trading day
   analyze_positions(sim_name)     - Position sizing and distribution
-  analyze_executions(sim_name)    - Trading signal generation patterns
 
 KEY METRICS:
   - Sharpe Ratio: Risk-adjusted return (>1 is good, >2 is excellent)
