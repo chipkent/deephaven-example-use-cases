@@ -1,0 +1,25 @@
+name: "cleanup_batch"
+
+deephaven:
+  connection_url: "${DH_CONNECTION_URL}"
+  auth_method: "password"
+  username: "${DH_USERNAME}"
+  password: "${DH_PASSWORD}"
+  
+execution:
+  worker_script: "cleanup.py"
+  num_partitions: 1
+  max_concurrent_sessions: 1
+  heap_size_gb: 4.0
+  script_language: "Python"
+
+batch:
+  timeout_minutes: 5
+
+dates:
+  start: "2024-01-01"
+  end: "2024-01-01"
+  weekdays_only: false
+  
+env:
+  OUTPUT_NAMESPACE: "ExampleBatchTradingSim"

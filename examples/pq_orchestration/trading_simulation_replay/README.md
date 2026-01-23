@@ -1,10 +1,12 @@
-# Trading Simulation Example
+# Trading Simulation Replay Example
 
-A market maker simulation based on mean-reversion strategy, designed to backtest trading algorithms across historical data using the replay orchestration framework.
+A market maker simulation based on mean-reversion strategy, designed to backtest trading algorithms across historical data using the persistent query orchestration framework with realistic time-based data arrival.
 
 ## Overview
 
-This example implements a complete trading simulation based on [`examples/finance/simulated_market_maker`](../../finance/simulated_market_maker). It demonstrates how to run large-scale backtests by partitioning stocks across multiple partitions and processing historical dates in parallel.
+This example implements a complete trading simulation based on [`examples/finance/simulated_market_maker`](../../finance/simulated_market_maker). It demonstrates how to run large-scale backtests by partitioning stocks across multiple partitions and processing historical dates in parallel using replay mode (live data simulation).
+
+**Batch alternative**: For vectorized processing of complete historical datasets without time simulation, see [`trading_simulation_batch/`](../trading_simulation_batch/).
 
 ## Implementation
 
@@ -29,7 +31,7 @@ num_partitions = int(os.getenv("NUM_PARTITIONS"))  # 2 partitions per date
 my_symbols = all_symbols.where(f"Sym.hashCode() % {num_partitions} == {partition_id}")
 ```
 
-**Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in [`trading_simulation.py`](trading_simulation.py).
+**Note**: This example uses 10 hardcoded symbols (AAPL, GOOG, MSFT, etc.) for demonstration. To scale to larger universes like SP500, modify the `all_symbols` table in [`trading_simulation_replay.py`](trading_simulation_replay.py).
 
 ### Configuration
 
@@ -39,20 +41,23 @@ Key configuration settings:
 execution:
   num_partitions: 2            # 2 partitions per date (each processes a subset of stocks)
   max_concurrent_sessions: 10  # Max total sessions running concurrently
+  heap_size_gb: 16.0           # RAM allocated per session
+  script_language: "Python"
   
 replay:
-  heap_size_gb: 16.0           # RAM allocated per session
+  init_timeout_minutes: 30
+  replay_start: "09:30:00"
   replay_speed: 100.0          # 100x speed for faster backtesting
   
 dates:
   start: "2024-01-01"
-  end: "2024-12-31"
-  weekdays_only: true          # 250 trading days
+  end: "2024-01-31"
+  weekdays_only: true          # 23 trading days in Jan 2024
 ```
 
-This creates **2 partitions per date × 250 days = 500 total replay sessions**.
+This creates **2 partitions per date × 23 days (Jan 2024) = 46 total replay sessions**.
 
-**Note**: For larger-scale backtesting, increase `num_partitions` (e.g., to 10 for 2,500 sessions) and adjust `max_concurrent_sessions` based on your server capacity.
+**Note**: To backtest a full year, expand the date range (e.g., `end: "2024-12-31"`) which would create ~500 sessions (2 partitions × ~250 trading days). You can also increase `num_partitions` for more parallel processing.
 
 ### Environment Variables
 
@@ -79,15 +84,19 @@ See the [main README](../README.md) for setup instructions. This example require
 
 **1. Configure** - Edit [`config.yaml`](config.yaml) to set date range and parameters. For testing, use a small date range (1-5 days).
 
-**2. Clean existing tables** - Run [`manage_user_tables.py`](manage_user_tables.py) in the Deephaven console and call `delete_all_tables()` to remove any previous simulation data.
-
-**3. Run** - From the `replay_orchestration` directory:
+**2. Clean existing tables** - Run the cleanup script to remove any previous simulation data:
 
 ```bash
-replay-orchestrator --config trading_simulation/config.yaml
+pq-orchestrator --config trading_simulation_replay/cleanup.yaml
 ```
 
-This creates 500 sessions (2 partitions × 250 trading days) and writes results to partitioned user tables in the `ExampleReplayTradingSim` namespace. Tables are auto-created on first write.
+**3. Run** - From the `pq_orchestration` directory:
+
+```bash
+pq-orchestrator --config trading_simulation_replay/config.yaml
+```
+
+This creates 46 sessions (2 partitions × 23 trading days in Jan 2024) and writes results to partitioned user tables in the `ExampleReplayTradingSim` namespace. Tables are auto-created on first write.
 
 ## Output Tables
 
@@ -118,8 +127,8 @@ In the Deephaven IDE console, open the script file and execute it directly (use 
 **Quick start workflow:**
 
 ```python
-# Your simulation name from config.yaml
-sim_name = "trading_simulation"
+# Your simulation name from config.yaml (line 1 of config.yaml)
+sim_name = "trading_simulation_replay"
 
 # Step 1: Get high-level overview
 summary = get_summary(sim_name)
@@ -155,48 +164,34 @@ aapl_stats = aapl["stats"]               # Performance summary for AAPL
 
 All functions return dictionaries of Deephaven tables that automatically display in the UI when assigned to variables.
 
-### [manage_user_tables.py](manage_user_tables.py)
+### [cleanup.py](cleanup.py) and [cleanup.yaml](cleanup.yaml)
 
-Table management utilities for accessing and cleaning simulation data.
+Cleanup script and configuration for deleting all simulation tables.
 
-**Load the script:**
+**Usage:**
 
-In the Deephaven IDE console, open the script file and execute it directly (use the "Run" button or Ctrl/Cmd+Enter).
+Run via the orchestrator to delete all tables in the simulation namespace:
 
-**Common operations:**
-
-```python
-# List all simulation tables with row counts
-list_tables()
-
-# Get a table for querying
-trades = get_table("TradingSimTrades")
-pnl = get_table("TradingSimPnl")
-
-# Query the data
-trades.where("Sym = `AAPL`").tail(100)
-pnl.view(["Date", "Sym", "PnL"])
-
-# Delete specific table
-delete_table("TradingSimTrades")
-
-# Delete all simulation data (use before new runs)
-delete_all_tables()
+```bash
+pq-orchestrator --config trading_simulation_replay/cleanup.yaml
 ```
 
-**Available functions:**
+This will delete all 7 tables created by the replay simulation:
 
-- `list_tables()` - Show all tables in namespace with row counts
-- `get_table(name)` - Retrieve a table for analysis
-- `delete_table(name)` - Delete a specific table
-- `delete_all_tables()` - Delete all simulation tables (prompts for confirmation)
+- TradingSimTrades
+- TradingSimPositions
+- TradingSimPnl
+- TradingSimPreds
+- TradingSimOrders
+- TradingSimExecutions
+- TradingSimSummary
 
 ## Expected Results
 
 After completion, you'll have:
 
-- Historical trades across a full year (250 trading days)
-- 500 total sessions (2 partitions × 250 days)
+- Historical trades across January 2024 (23 trading days)
+- 46 total sessions (2 partitions × 23 days)
 - Trades partitioned by date and partition
 - Daily PnL by symbol
 - Position history
@@ -235,8 +230,17 @@ See [`examples/finance/simulated_market_maker`](../../finance/simulated_market_m
 
 To adapt for your use case:
 
-1. **Change stock universe**: Modify the `all_symbols` table in [`trading_simulation.py`](trading_simulation.py)
+1. **Change stock universe**: Modify the `all_symbols` table in [`trading_simulation_replay.py`](trading_simulation_replay.py)
 2. **Adjust strategy parameters**: Update `MAX_POSITION_DOLLARS`, `EMA_DECAY_TIME`, `LOT_SIZE` in [`config.yaml`](config.yaml)
 3. **Scale partitions**: Increase `num_partitions` to process more symbols in parallel
 4. **Adjust date range**: Modify `dates.start` and `dates.end` in [`config.yaml`](config.yaml)
 5. **Speed up replay**: Increase `replay_speed` for faster backtesting (currently 100x)
+
+## Files
+
+- [`trading_simulation_replay.py`](trading_simulation_replay.py) - Replay worker script
+- [`config.yaml`](config.yaml) - Replay configuration
+- [`cleanup.py`](cleanup.py) - Cleanup script for deleting tables
+- [`cleanup.yaml`](cleanup.yaml) - Cleanup orchestrator configuration
+- [`analyze_trading_results.py`](analyze_trading_results.py) - Performance analysis tools
+- [`README.md`](README.md) - This file

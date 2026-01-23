@@ -1,4 +1,4 @@
-name: "simple_worker_example"
+name: "simple_worker_replay_example"
 
 deephaven:
   connection_url: "${DH_CONNECTION_URL}"
@@ -7,14 +7,14 @@ deephaven:
   password: "${DH_PASSWORD}"
   
 execution:
-  worker_script: "simple_worker.py"
+  worker_script: "simple_worker_replay.py"
   num_partitions: 2
   max_concurrent_sessions: 10
+  heap_size_gb: 4.0
+  script_language: "Python"
   
 replay:
-  heap_size_gb: 4.0
   init_timeout_minutes: 10
-  script_language: "Python"
   replay_start: "09:30:00"
   replay_speed: 100.0
 

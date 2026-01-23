@@ -1,0 +1,26 @@
+name: "simple_worker_batch_example"
+
+deephaven:
+  connection_url: "${DH_CONNECTION_URL}"
+  auth_method: "password"
+  username: "${DH_USERNAME}"
+  password: "${DH_PASSWORD}"
+  
+execution:
+  worker_script: "simple_worker_batch.py"
+  num_partitions: 2
+  max_concurrent_sessions: 10
+  heap_size_gb: 4.0
+  script_language: "Python"
+
+batch:
+  timeout_minutes: 5
+
+dates:
+  start: "2024-01-01"
+  end: "2024-01-05"
+  weekdays_only: true
+  
+env:
+  LOG_LEVEL: "INFO"
+  CUSTOM_MESSAGE: "Hello from simple worker batch example!"
