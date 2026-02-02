@@ -46,7 +46,7 @@ The market maker uses a mean-reversion strategy based on EMAs:
 
 ## Running the Example
 
-Execute [./market_maker.py](./market_maker.py) in a Deephaven Enterprise environment with FeedOS access. The script will begin monitoring the configured symbols (AAPL, GOOG, BAC by default) and executing trades when conditions are met.
+Copy the contents of [`market_maker.py`](./market_maker.py) and paste it into the console of a Deephaven Enterprise environment with FeedOS access. The script will begin monitoring the configured symbols (AAPL, GOOG, BAC by default) and executing trades when conditions are met.
 
 ## Backtesting
 

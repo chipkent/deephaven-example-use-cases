@@ -67,7 +67,7 @@ compute_factors(
 
 ## Running the Example
 
-Execute [./market_factors.py](./market_factors.py) in Deephaven Enterprise. The script:
+Copy the contents of [`market_factors.py`](./market_factors.py) and paste it into the console of Deephaven Enterprise. The script:
 1. Queries FeedOS for historical 5-minute trade data
 2. Analyzes 500+ US equity symbols over the specified date range
 3. Extracts the top 10 market factors
