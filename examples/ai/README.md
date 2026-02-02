@@ -19,11 +19,7 @@ The script [`listener_based_ai.py`](./listener_based_ai.py) shows how to:
 
 ## Running the Example
 
-Execute the script in the Deephaven console:
-
-```python
-exec(open("examples/ai/listener_based_ai.py").read())
-```
+Copy the contents of the script [`listener_based_ai.py`](./listener_based_ai.py) and paste it directly into the Deephaven console to run it.
 
 ## Output
 

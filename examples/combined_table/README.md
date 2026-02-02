@@ -30,26 +30,29 @@ This keeps the historical and live tables separate as long as possible, maintain
 
 ## Usage
 
-### Server-Side
-Use `combined_table_server` when running scripts on the Deephaven server.
+Choose the instructions below based on whether you are running on the Deephaven server or from a Python client.
+
+### Server-Side Usage
+
+1.  Copy the contents of **[`combined_table_common.py`](./combined_table_common.py)** and paste it into the console.
+2.  Copy the contents of **[`combined_table_server.py`](./combined_table_server.py)** and paste it into the console.
+3.  Run the example code:
 
 ```python
-from examples.misc.combined_table.combined_table_server import combined_table
-
 # Create a combined view of the "trades" table
-# Assumes you have a "trades" table in both historical and live databases
 trades = combined_table("data", "trades", date_col="Date")
 
 # Use it exactly like a normal table
 aapl_trades = trades.where(["Symbol = 'AAPL'", "Price > 150"])
 ```
 
-### Client-Side (Python Client)
-Use `combined_table_client` when connecting from a Python client.
+### Client-Side Usage
+
+1.  Copy the contents of **[`combined_table_common.py`](./combined_table_common.py)** and paste it into the console.
+2.  Copy the contents of **[`combined_table_client.py`](./combined_table_client.py)** and paste it into the console.
+3.  Run the example code:
 
 ```python
-from examples.misc.combined_table.combined_table_client import combined_table
-
 # session is your pydeephaven.Session object
 trades = combined_table(session, "data", "trades", date_col="Date")
 

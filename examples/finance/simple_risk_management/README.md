@@ -31,7 +31,7 @@ The system calculates the following Greeks using the Black-Scholes model:
 
 ## Running the Example
 
-Execute [./risk_management.py](./risk_management.py) in Deephaven. The script automatically downloads and imports [./setup_risk_management.py](./setup_risk_management.py), which:
+Copy the contents of [`risk_management.py`](./risk_management.py) and paste it into the Deephaven console. The script automatically downloads and imports [./setup_risk_management.py](./setup_risk_management.py), which:
 
 - Implements Black-Scholes option pricing functions using Numba for performance
 - Generates simulated market data (prices, volatility, trades)

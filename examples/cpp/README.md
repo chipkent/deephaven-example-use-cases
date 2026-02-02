@@ -81,7 +81,7 @@ deephaven server \
   --jvm-args "-Djava.library.path=./venv/example -DAuthHandlers=io.deephaven.auth.AnonymousAuthenticationHandler"
 
 # Open http://localhost:10000 in your browser
-# Then run: exec(open('examples/options_pricing.py').read())
+# Then copy the contents of [`examples/options_pricing.py`](examples/options_pricing.py) and paste it into the console to run it.
 ```
 
 ### Option 3: Use Docker (Easiest)

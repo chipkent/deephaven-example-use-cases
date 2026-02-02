@@ -26,16 +26,7 @@ This example uses a **background Python thread**.
 
 ## Running the Examples
 
-Run these scripts directly in the Deephaven console.
-
-**Listener Example:**
-```python
-exec(open("examples/pandas_interop/update_dataframe_listener.py").read())
-```
-*Watch the "Update: Value:..." output printed to the console as the table updates.*
-
-**Thread Example:**
-```python
-exec(open("examples/pandas_interop/update_dataframe_thread.py").read())
-```
+Copy the contents of the desired script and paste it directly into the Deephaven console to run it.
+*   **Listener Approach**: [`update_dataframe_listener.py`](./update_dataframe_listener.py)
+*   **Thread Approach**: [`update_dataframe_thread.py`](./update_dataframe_thread.py)
 *Watch the background thread print the DataFrame value every 5 seconds.*

@@ -70,7 +70,7 @@ Multiple time periods for moving average and standard deviation:
 
 ## Running the Example
 
-Execute [`stock_dashboard.py`](./stock_dashboard.py) in Deephaven. The dashboard will appear with:
+Copy the contents of [`stock_dashboard.py`](./stock_dashboard.py) and paste it into the Deephaven console. The dashboard will appear with:
 
 1. **Left panel (65% width)**:
    - Line plot with price, rolling average, and Bollinger bands

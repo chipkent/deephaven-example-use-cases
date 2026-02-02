@@ -25,7 +25,7 @@ The example can be run in two ways:
 
 ### Option 1: Combined Script (Recommended for Quick Start)
 
-Execute [./option_risk_combined.py](./option_risk_combined.py) as a single script containing all functionality. This is a longer file but runs everything at once.
+Copy the contents of [`option_risk_combined.py`](./option_risk_combined.py) and paste it into the Deephaven console. This script contains all functionality and runs everything at once.
 
 ### Option 2: Step-by-Step Modules (Recommended for Learning/Demos)
 

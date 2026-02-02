@@ -41,7 +41,7 @@ PendingSubmit → Submitted → PartialFilled → Filled
 
 ## Running the Example
 
-Execute [./simulated_orders.py](./simulated_orders.py) in Deephaven. The simulation starts automatically and runs continuously, generating order state changes based on configurable probabilities.
+Copy the contents of [`simulated_orders.py`](./simulated_orders.py) and paste it into the Deephaven console. The simulation starts automatically and runs continuously, generating order state changes based on configurable probabilities.
 
 ### Simulation Parameters
 

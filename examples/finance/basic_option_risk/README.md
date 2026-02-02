@@ -36,7 +36,7 @@ The example includes post-trade analysis that measures price movement 10 minutes
 
 ## Running the Example
 
-Simply execute [./risk_management.py](./risk_management.py) in Deephaven. The script will:
+Simply copy the contents of [./risk_management.py](./risk_management.py) and paste it into the Deephaven console. The script will:
 1. Define Black-Scholes pricing functions
 2. Generate simulated market data (prices and volatility)
 3. Create options at multiple strikes and expiries

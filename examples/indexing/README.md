@@ -14,17 +14,7 @@ The script [`indexing.py`](./indexing.py) runs a series of benchmarks comparing 
 
 ## Running the Example
 
-Run the script directly in the Deephaven console:
-
-```python
-import examples.misc.indexing.indexing
-```
-
-Or execute the file contents:
-
-```python
-exec(open("examples/misc/indexing/indexing.py").read())
-```
+Copy the contents of the script [`indexing.py`](./indexing.py) and paste it directly into the Deephaven console to run it.
 
 ## Benchmarks Performed
 
