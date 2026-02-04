@@ -4,7 +4,11 @@ It acts as a consumer, fetching tables from the 'Source' instance (port 10000) u
 """
 from deephaven.uri import resolve
 
-print("Resolving tables from the remote server (port 10000)...")
+# ------------------------------------------------------------------------------
+# Configuration: Authentication
+# The server is configured with Anonymous authentication because Deephaven Core
+# currently requires it for URI resolution (see issue #5383).
+# ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
 # 1. Resolve Remote Tables

@@ -22,17 +22,16 @@ cleanup() {
 
 trap cleanup EXIT
 
+# Configure Anonymous Authentication (No credentials required)
+# Note: Deephaven Core currently requires Anonymous auth for URI resolution.
+# See https://github.com/deephaven/deephaven-core/issues/5383
+
 echo "Starting Server 1 (The 'Source' Server) on port 10000..."
-# CRITICAL: We pipe 'tail -f /dev/null' into the server to keep the standard input (stdin) open.
-# When running in the background ('&'), the server would otherwise immediately encounter
-# an "End of File" (EOF) on stdin and shut down to prevent hanging resources.
-tail -f /dev/null | deephaven server --port 10000 --browser &
+# Pipe tail -f /dev/null to stdin to prevent the server from exiting immediately due to EOF
+tail -f /dev/null | deephaven server --port 10000 --browser --jvm-args "-DAuthHandlers=io.deephaven.auth.AnonymousAuthenticationHandler" &
 
 echo "Starting Server 2 (The 'Consumer' Server) on port 10001..."
-# CRITICAL: We pipe 'tail -f /dev/null' into the server to keep the standard input (stdin) open.
-# When running in the background ('&'), the server would otherwise immediately encounter
-# an "End of File" (EOF) on stdin and shut down to prevent hanging resources.
-tail -f /dev/null | deephaven server --port 10001 --browser &
+tail -f /dev/null | deephaven server --port 10001 --browser --jvm-args "-DAuthHandlers=io.deephaven.auth.AnonymousAuthenticationHandler" &
 
 # Wait for both background processes
 wait

@@ -12,6 +12,8 @@ In this example, we simulate a distributed system with two independent Deephaven
 ## Key Concepts
 
 *   **[URI Resolution](https://deephaven.io/core/docs/conceptual/uri-resolution/)**: The mechanism used to fetch disjoint tables from a remote server using a standardized URI format (e.g., `dh+plain://host:port/scope/table`).
+    *   **Community Core Note**: This example uses **Anonymous Authentication** because Deephaven Core currently only supports anonymous authentication for URI resolution (see issues [#5383](https://github.com/deephaven/deephaven-core/issues/5383) and [#3421](https://github.com/deephaven/deephaven-core/issues/3421)).
+    *   **Enterprise Note**: In **Deephaven Enterprise**, authentication is managed automatically and seamlessly, so this limitation does not apply.
 *   **[Time Table](https://deephaven.io/core/docs/reference/table-operations/source/time-table/)**: Used on the source server to generate a ticking data stream.
 *   **[Aggregations](https://deephaven.io/core/docs/reference/table-operations/aggregation/agg-by/)**: Used to compute real-time statistics (`avg_by`) on the source.
 *   **[Natural Join](https://deephaven.io/core/docs/reference/table-operations/join/natural-join/)**: Used on the client to combine a resolved remote table with another local view.
