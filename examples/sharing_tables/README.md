@@ -1,4 +1,4 @@
-# Remote Tables (Client-Server) Example
+# Sharing Tables (Client-Server) Example
 
 This example demonstrates a fundamental distributed computing pattern in Deephaven: **publishing** tables on one server and **consuming** them from another using [URI Resolution](https://deephaven.io/core/docs/conceptual/uri-resolution/).
 

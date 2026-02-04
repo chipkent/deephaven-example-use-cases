@@ -2,7 +2,7 @@
 set -e
 
 # ------------------------------------------------------------------------------
-# Remote Tables Example - Setup Script
+# Sharing Tables Example - Setup Script
 #
 # This script prepares the Python environment for the example.
 # 1. Creates a virtual environment ('venv') if not present.

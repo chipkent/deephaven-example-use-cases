@@ -2,7 +2,7 @@
 set -e
 
 # ------------------------------------------------------------------------------
-# Remote Tables Example - Run Script
+# Sharing Tables Example - Run Script
 #
 # This script launches two independent Deephaven server instances.
 # 1. Server 1 (Port 10000): The data source.
