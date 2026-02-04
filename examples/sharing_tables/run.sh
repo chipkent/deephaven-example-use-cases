@@ -23,10 +23,16 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Starting Server 1 (The 'Source' Server) on port 10000..."
-deephaven server --port 10000 --browser &
+# CRITICAL: We pipe 'tail -f /dev/null' into the server to keep the standard input (stdin) open.
+# When running in the background ('&'), the server would otherwise immediately encounter
+# an "End of File" (EOF) on stdin and shut down to prevent hanging resources.
+tail -f /dev/null | deephaven server --port 10000 --browser &
 
 echo "Starting Server 2 (The 'Consumer' Server) on port 10001..."
-deephaven server --port 10001 --browser &
+# CRITICAL: We pipe 'tail -f /dev/null' into the server to keep the standard input (stdin) open.
+# When running in the background ('&'), the server would otherwise immediately encounter
+# an "End of File" (EOF) on stdin and shut down to prevent hanging resources.
+tail -f /dev/null | deephaven server --port 10001 --browser &
 
 # Wait for both background processes
 wait
