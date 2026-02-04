@@ -46,21 +46,20 @@ Execute the run script to launch both Deephaven instances. This will open two br
 *   **Tab 2 (http://localhost:10001)**: The **Client** Server
 
 ### 2. Configure the Source (Tab 1)
-Switch to the **Source Server** tab (Port 10000).
+### 2. Run Server Script:
+    *   **CHECK THE PORT**: Go to the browser tab for **Port 10000** (the "Source" server).
+    *   Copy the code from **[`server.py`](./server.py)** and paste it into the console.
+    *   Run the code.
+    *   **Verify**: You should see three tables appear in the "Panels" area: `raw_metrics`, `high_value_metrics`, and `avg_by_id`. These are now "published" and available for resolution.
 
-1.  Copy the code from **[`server.py`](./server.py)**.
-2.  Paste it into the script console and run it.
-3.  **Verify**: You should see three tables appear in the "Panels" area: `raw_metrics`, `high_value_metrics`, and `avg_by_id`. These are now "published" and available for resolution.
-
-### 3. Configure the Client (Tab 2)
-Switch to the **Client Server** tab (Port 10001).
-
-1.  Copy the code from **[`client.py`](./client.py)**.
-2.  Paste it into the script console and run it.
-3.  **Verify**:
-    *   The script uses `deephaven.uri.resolve` to fetch the distinct tables from Port 10000.
-    *   New tables will appear: `raw_metrics`, `high_value_metrics`, and `avg_by_id` (these are proxies to the source).
-    *   Derived tables `filtered_client_view` and `joined_client_view` are created locally, demonstrating that you can join and filter remote tables just like local ones.
+### 3. Run Client Script:
+    *   **CHECK THE PORT**: Go to the browser tab for **Port 10001** (the "Consumer" server).
+    *   Copy the code from **[`client.py`](./client.py)** and paste it into the console.
+    *   Run the code.
+    *   **Verify**:
+        *   The script uses `deephaven.uri.resolve` to fetch the distinct tables from Port 10000.
+        *   New tables will appear: `raw_metrics`, `high_value_metrics`, and `avg_by_id` (these are proxies to the source).
+        *   Derived tables `filtered_client_view` and `joined_client_view` are created locally, demonstrating that you can join and filter remote tables just like local ones.
 
 ## Need Help?
 
