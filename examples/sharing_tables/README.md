@@ -16,6 +16,13 @@ In this example, we simulate a distributed system with two independent Deephaven
 *   **[Aggregations](https://deephaven.io/core/docs/reference/table-operations/aggregation/agg-by/)**: Used to compute real-time statistics (`avg_by`) on the source.
 *   **[Natural Join](https://deephaven.io/core/docs/reference/table-operations/join/natural-join/)**: Used on the client to combine a resolved remote table with another local view.
 
+## Files
+
+*   **[`setup.sh`](./setup.sh)**: Sets up the Python environment (Prerequisite).
+*   **[`run.sh`](./run.sh)**: Orchestration script. Launches both servers.
+*   **[`server.py`](./server.py)**: The producer logic. Generates data and aggregations.
+*   **[`client.py`](./client.py)**: The consumer logic. Resolves remote tables and joins them.
+
 ## Prerequisites
 
 This example requires Docker and Python. The setup script will create a Python virtual environment and install the necessary `deephaven-server` package.
@@ -52,13 +59,6 @@ Switch to the **Client Server** tab (Port 10001).
     *   The script uses `deephaven.uri.resolve` to fetch the distinct tables from Port 10000.
     *   New tables will appear: `raw_metrics`, `high_value_metrics`, and `avg_by_id` (these are proxies to the source).
     *   Derived tables `filtered_client_view` and `joined_client_view` are created locally, demonstrating that you can join and filter remote tables just like local ones.
-
-## Files
-
-*   **[`server.py`](./server.py)**: The producer logic. Generates data and aggregations.
-*   **[`client.py`](./client.py)**: The consumer logic. Resolves remote tables and joins them.
-*   **[`setup.sh`](./setup.sh)**: Sets up the Python environment.
-*   **[`run.sh`](./run.sh)**: Orchestration script to run both servers.
 
 ## Need Help?
 
