@@ -27,7 +27,7 @@ In this example, we simulate a distributed system with two independent Deephaven
 
 ## Prerequisites
 
-This example requires Docker and Python. The setup script will create a Python virtual environment and install the necessary `deephaven-server` package.
+This example requires **Python**. The setup script will create a Python virtual environment and install the necessary `deephaven-server` package (no Docker required).
 
 ```bash
 ./setup.sh
@@ -45,8 +45,8 @@ Execute the run script to launch both Deephaven instances. This will open two br
 *   **Tab 1 (http://localhost:10000)**: The **Source** Server
 *   **Tab 2 (http://localhost:10001)**: The **Client** Server
 
-### 2. Configure the Source (Tab 1)
-### 2. Run Server Script:
+### 2. Run Server Script
+Switch to the **Source Server** tab (Port 10000).
     *   **CHECK THE PORT**: Go to the browser tab for **Port 10000** (the "Source" server).
     *   Copy the code from **[`server.py`](./server.py)** and paste it into the console.
     *   Run the code.
